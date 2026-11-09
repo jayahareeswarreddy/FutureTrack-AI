@@ -1,70 +1,113 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+// Set REACT_APP_API_URL at build time to point the UI at a deployed backend.
+// The default suits `uvicorn server:app --port 8010` from the backend folder.
+const API_BASE_URL =
+  process.env.REACT_APP_API_URL || 'http://localhost:8010';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  timeout: 45000,
+  headers: { 'Content-Type': 'application/json' },
 });
 
-export const getCareers = async () => {
-  try {
-    const response = await api.get('/careers');
-    console.log('API Response:', response.data);
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching careers:', error);
-    if (error.code === 'ECONNREFUSED' || error.message.includes('Network Error')) {
-      throw new Error('Backend server is not running. Please start it on port 8000.');
-    }
-    throw error;
-  }
-};
+export { API_BASE_URL };
 
-export const getCareerById = async (id) => {
-  try {
-    const response = await api.get(`/careers/${id}`);
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching career:', error);
-    throw error;
+/**
+ * Turn an axios failure into one sentence a user can act on.
+ *
+ * Axios reports an unreachable host as a generic "Network Error", which tells
+ * a visitor nothing, so the three cases worth distinguishing are named here:
+ * backend down, backend slow, and backend answered with an error.
+ */
+function describe(error, fallback) {
+  if (error.response) {
+    const detail = error.response.data?.detail;
+    if (typeof detail === 'string') return detail;
+    if (Array.isArray(detail) && detail[0]?.msg) return detail[0].msg;
+    return `${fallback} (HTTP ${error.response.status})`;
   }
-};
+  if (error.code === 'ECONNABORTED') {
+    return 'The backend took too long to respond. It may be waking from sleep — try again in a moment.';
+  }
+  return `Cannot reach the backend at ${API_BASE_URL}. Start it with "uvicorn server:app --port 8010" from the backend folder.`;
+}
 
-export const searchCareers = async (query) => {
+async function request(promise, fallback) {
   try {
-    const response = await api.get('/careers/search', { params: { q: query } });
-    return response.data;
+    const { data } = await promise;
+    return data;
   } catch (error) {
-    console.error('Error searching careers:', error);
-    throw error;
+    throw new Error(describe(error, fallback));
   }
-};
+}
 
-export const getRecommendations = async (profile) => {
-  try {
-    const response = await api.post('/recommendations', profile);
-    return response.data;
-  } catch (error) {
-    console.error('API Error:', error);
-    // Return fallback recommendations if API fails
-    if (error.code === 'ECONNREFUSED' || error.message.includes('Network Error')) {
-      throw new Error('Backend server is not running. Please start the backend server on port 8000.');
-    }
-    throw error;
-  }
-};
+/* ----------------------------- careers ----------------------------- */
 
-export const getLearningRoadmap = async (careerId) => {
-  try {
-    const response = await api.get(`/careers/${careerId}/roadmap`);
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching roadmap:', error);
-    throw error;
-  }
-};
+export const getCareers = () =>
+  request(api.get('/careers'), 'Could not load careers');
+
+export const getCareerById = (id) =>
+  request(api.get(`/careers/${encodeURIComponent(id)}`), 'Could not load that career');
+
+export const searchCareers = (query) =>
+  request(api.get('/careers/search', { params: { q: query } }), 'Search failed');
+
+export const getLearningRoadmap = (careerId) =>
+  request(
+    api.get(`/careers/${encodeURIComponent(careerId)}/roadmap`),
+    'Could not load the roadmap'
+  );
+
+/* -------------------------- recommendations ------------------------- */
+
+export const getRecommendations = (profile) =>
+  request(api.post('/recommendations', profile), 'Could not generate recommendations');
+
+/* ------------------------- taxonomy & health ------------------------ */
+
+export const getHealth = () =>
+  request(api.get('/health'), 'Health check failed');
+
+export const getCategories = () =>
+  request(api.get('/categories'), 'Could not load categories');
+
+export const getSkills = (limit = 100) =>
+  request(api.get('/skills', { params: { limit } }), 'Could not load the skill list');
+
+/* --------------------------- skill gap ------------------------------ */
+
+export const getSkillGap = ({ careerId, skills, experienceYears = 0 }) =>
+  request(
+    api.post('/skill-gap', {
+      career_id: careerId,
+      skills,
+      experience_years: experienceYears,
+    }),
+    'Skill-gap analysis failed'
+  );
+
+/* ---------------------------- profiles ------------------------------ */
+
+export const saveProfile = (profile) =>
+  request(api.post('/profiles', profile), 'Could not save the profile');
+
+export const getProfile = (profileId) =>
+  request(
+    api.get(`/profiles/${encodeURIComponent(profileId)}`),
+    'Could not load that profile'
+  );
+
+
+/* --------------------------- learning resources --------------------- */
+
+export const getCareerResources = (careerId) =>
+  request(
+    api.get(`/careers/${encodeURIComponent(careerId)}/resources`),
+    'Could not load learning resources'
+  );
+
+export const getSkillResources = (skill) =>
+  request(api.get('/resources', { params: { skill } }), 'Could not load resources');
 
 export default api;

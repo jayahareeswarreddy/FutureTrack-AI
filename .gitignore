@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Secrets
+.env
+.env.local
+
+# Node
+node_modules/
+frontend/build/
+npm-debug.log*
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/

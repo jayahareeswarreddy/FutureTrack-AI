@@ -1,182 +1,161 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Sparkles, Target, BookOpen, TrendingUp, ArrowRight, Brain, Users, Award } from 'lucide-react';
+import {
+  ArrowRight,
+  Target,
+  Map,
+  ShieldCheck,
+  Search,
+  Layers,
+} from 'lucide-react';
+import { getCategories } from '../lib/api';
+import { Button, Card, Badge, Skeleton } from './ui';
 
-const Home = () => {
-  const features = [
-    {
-      icon: Brain,
-      title: 'AI-Powered Recommendations',
-      description: 'Get personalized career suggestions using OpenAI GPT-4o-mini'
-    },
-    {
-      icon: Target,
-      title: '24+ Career Paths',
-      description: 'Explore comprehensive career options in tech, AI/ML, data, and more'
-    },
-    {
-      icon: BookOpen,
-      title: 'Learning Roadmaps',
-      description: 'Get step-by-step learning paths for your chosen career'
-    },
-    {
-      icon: TrendingUp,
-      title: 'Career Insights',
-      description: 'Understand salary ranges, growth potential, and required skills'
-    }
-  ];
+const FEATURES = [
+  {
+    icon: Target,
+    title: 'Matched on your actual skills',
+    body: 'Your skills, interests and experience are scored against every career in the database. The score is computed in Python, not guessed by a model.',
+  },
+  {
+    icon: ShieldCheck,
+    title: 'Validated AI explanations',
+    body: 'GPT-4o-mini writes the reasoning, but every response is checked against a JSON Schema first. Malformed output is retried, then falls back to a rule-based explanation.',
+  },
+  {
+    icon: Map,
+    title: 'Step-by-step roadmaps',
+    body: 'Each career comes with an ordered learning path — what to learn, in what order, and roughly how long it takes.',
+  },
+  {
+    icon: Layers,
+    title: 'Skill-gap analysis',
+    body: 'Pick a target role and see exactly which required skills you already cover, which are missing, and the order to close them in.',
+  },
+];
 
-  const categories = [
-    { name: 'Software Development', count: 4, color: 'bg-blue-500' },
-    { name: 'AI/ML', count: 7, color: 'bg-purple-500' },
-    { name: 'Data', count: 3, color: 'bg-green-500' },
-    { name: 'Cloud/DevOps', count: 3, color: 'bg-orange-500' },
-    { name: 'Cybersecurity', count: 2, color: 'bg-red-500' },
-    { name: 'Other', count: 5, color: 'bg-indigo-500' }
-  ];
+export default function Home() {
+  const [categories, setCategories] = useState(null);
 
-  const testimonials = [
-    {
-      quote: 'This platform is a game-changer! The AI recommendations were spot-on and helped me discover a career path I had never considered.',
-      name: 'Alex Johnson',
-      title: 'Aspiring Data Scientist'
-    },
-    {
-      quote: 'The learning roadmaps are incredibly detailed and actionable. I finally have a clear plan to transition into a new role.',
-      name: 'Samantha Lee',
-      title: 'Marketing Professional'
-    },
-    {
-      quote: 'I was feeling lost in my career, but this tool gave me the clarity and confidence I needed to move forward. Highly recommended!',
-      name: 'Michael Chen',
-      title: 'Recent Graduate'
-    }
-  ];
+  useEffect(() => {
+    let cancelled = false;
+    getCategories()
+      .then((d) => !cancelled && setCategories(d))
+      .catch(() => !cancelled && setCategories({ categories: [] }));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const careerCount =
+    categories?.categories?.reduce((sum, c) => sum + c.career_count, 0) ?? null;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Hero Section */}
-      <div className="relative bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white overflow-hidden">
-        <div className="absolute inset-0 bg-grid-pattern opacity-10"></div>
-        <div className="container mx-auto px-4 py-24 relative z-10">
-          <div className="max-w-4xl mx-auto text-center">
-            <div className="flex justify-center mb-6">
-              <Sparkles className="h-16 w-16 text-yellow-400 animate-pulse" />
-            </div>
-            <h1 className="text-5xl md:text-7xl font-extrabold mb-6 tracking-tight">
-              Find Your Future in Tech
-            </h1>
-            <p className="text-xl md:text-2xl mb-10 text-gray-300 max-w-3xl mx-auto">
-              Navigate the complexities of the tech industry with AI-driven career guidance and personalized learning roadmaps.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link
-                to="/profile"
-                className="bg-indigo-600 text-white px-8 py-4 rounded-lg font-semibold text-lg hover:bg-indigo-700 transition-all transform hover:scale-105 shadow-lg flex items-center justify-center gap-2"
-              >
-                Get Your Free Analysis
-                <ArrowRight className="h-5 w-5" />
-              </Link>
-              <Link
-                to="/careers"
-                className="bg-transparent border-2 border-gray-400 text-white px-8 py-4 rounded-lg font-semibold text-lg hover:bg-white hover:text-gray-900 transition-all"
-              >
-                Explore Careers
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div className="space-y-section">
+      {/* ------------------------------ hero ------------------------------ */}
+      <section className="animate-fade-in-up">
+        <Badge tone="accent">AI career guidance</Badge>
+        <h1 className="mt-5 max-w-3xl text-4xl font-extrabold leading-[1.1] tracking-tight text-foreground sm:text-5xl lg:text-6xl">
+          Find the tech career your skills already point to.
+        </h1>
+        <p className="mt-5 max-w-2xl text-lg text-muted-foreground">
+          Describe what you know and what you enjoy. FutureTrack scores you
+          against{' '}
+          {careerCount ? (
+            <strong className="font-bold text-foreground">
+              {careerCount} career paths
+            </strong>
+          ) : (
+            'every career path'
+          )}
+          , explains each match, and hands you the roadmap to get there.
+        </p>
 
-      {/* Features Section */}
-      <div className="container mx-auto px-4 py-20">
-        <h2 className="text-4xl font-bold text-center mb-16 text-gray-900">
-          A Smarter Way to Plan Your Career
+        <div className="mt-8 flex flex-wrap gap-3">
+          <Button as={Link} to="/profile" variant="accent" size="lg">
+            Get my recommendations
+            <ArrowRight className="h-5 w-5" aria-hidden="true" />
+          </Button>
+          <Button as={Link} to="/careers" variant="outline" size="lg">
+            <Search className="h-5 w-5" aria-hidden="true" />
+            Browse all careers
+          </Button>
+        </div>
+      </section>
+
+      {/* ---------------------------- features --------------------------- */}
+      <section aria-labelledby="how-heading">
+        <h2
+          id="how-heading"
+          className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl"
+        >
+          How the matching works
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          {features.map((feature, index) => {
-            const Icon = feature.icon;
-            return (
-              <div
-                key={index}
-                className="bg-white p-8 rounded-xl shadow-lg hover:shadow-2xl transition-all transform hover:-translate-y-2"
-              >
-                <div className="bg-gradient-to-br from-indigo-500 to-purple-600 w-14 h-14 rounded-xl flex items-center justify-center mb-5">
-                  <Icon className="h-7 w-7 text-white" />
-                </div>
-                <h3 className="text-xl font-semibold mb-3 text-gray-900">{feature.title}</h3>
-                <p className="text-gray-600 leading-relaxed">{feature.description}</p>
-              </div>
-            );
-          })}
+        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          {FEATURES.map(({ icon: Icon, title, body }) => (
+            <Card key={title} className="p-6">
+              <span className="grid h-11 w-11 place-items-center rounded-xl bg-primary/10 text-primary">
+                <Icon className="h-5 w-5" aria-hidden="true" />
+              </span>
+              <h3 className="mt-4 text-lg font-bold text-foreground">{title}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                {body}
+              </p>
+            </Card>
+          ))}
         </div>
-      </div>
+      </section>
 
-      {/* Categories Section */}
-      <div className="bg-white py-20">
-        <div className="container mx-auto px-4">
-          <h2 className="text-4xl font-bold text-center mb-16 text-gray-900">
-            Explore Career Categories
+      {/* --------------------------- categories -------------------------- */}
+      <section aria-labelledby="cat-heading">
+        <h2
+          id="cat-heading"
+          className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl"
+        >
+          Fields covered
+        </h2>
+
+        {categories === null ? (
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {[0, 1, 2, 3, 4, 5].map((i) => (
+              <Skeleton key={i} className="h-28" />
+            ))}
+          </div>
+        ) : (
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {categories.categories.map((cat) => (
+              <Card key={cat.name} className="p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <h3 className="font-bold text-foreground">{cat.name}</h3>
+                  <Badge tone="primary">{cat.career_count}</Badge>
+                </div>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {cat.careers.slice(0, 3).join(' · ')}
+                  {cat.careers.length > 3 && ' …'}
+                </p>
+              </Card>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* ------------------------------- CTA ----------------------------- */}
+      <section>
+        <Card glass className="p-8 text-center sm:p-12">
+          <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+            Ready to see your matches?
           </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
-            {categories.map((category, index) => (
-              <Link
-                key={index}
-                to="/careers"
-                className="group block text-center p-4 rounded-xl transition-all transform hover:scale-110 hover:bg-gray-100"
-              >
-                <div className={`w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center ${category.color} transition-all group-hover:shadow-lg`}>
-                  <span className="text-2xl font-bold text-white">{category.count}</span>
-                </div>
-                <h3 className="text-lg font-semibold text-gray-800 group-hover:text-indigo-600">{category.name}</h3>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Testimonials Section */}
-      <div className="bg-gray-50 py-20">
-        <div className="container mx-auto px-4">
-          <h2 className="text-4xl font-bold text-center mb-16 text-gray-900">What Our Users Say</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {testimonials.map((testimonial, index) => (
-              <div key={index} className="bg-white p-8 rounded-xl shadow-lg">
-                <p className="text-gray-600 italic mb-6">"{testimonial.quote}"</p>
-                <div className="flex items-center">
-                  <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center mr-4">
-                    <span className="text-xl font-bold text-indigo-600">{testimonial.name.charAt(0)}</span>
-                  </div>
-                  <div>
-                    <p className="font-semibold text-gray-900">{testimonial.name}</p>
-                    <p className="text-gray-500">{testimonial.title}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* CTA Section */}
-      <div className="bg-gray-800 text-white py-20">
-        <div className="container mx-auto px-4 text-center">
-          <Award className="h-16 w-16 mx-auto mb-6 text-yellow-400" />
-          <h2 className="text-4xl font-bold mb-4">Ready to Unlock Your Potential?</h2>
-          <p className="text-xl mb-8 text-gray-300 max-w-2xl mx-auto">
-            Take the first step towards a fulfilling tech career. Get your personalized analysis today.
+          <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
+            The form takes about a minute. No account, no email.
           </p>
-          <Link
-            to="/profile"
-            className="bg-indigo-600 text-white px-10 py-4 rounded-lg font-semibold text-lg hover:bg-indigo-700 transition-all transform hover:scale-105 shadow-lg inline-flex items-center gap-2"
-          >
-            Start Your Journey
-            <ArrowRight className="h-5 w-5" />
-          </Link>
-        </div>
-      </div>
+          <div className="mt-7 flex justify-center">
+            <Button as={Link} to="/profile" variant="accent" size="lg">
+              Start now
+              <ArrowRight className="h-5 w-5" aria-hidden="true" />
+            </Button>
+          </div>
+        </Card>
+      </section>
     </div>
   );
-};
-
-export default Home;
+}

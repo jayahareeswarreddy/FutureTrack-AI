@@ -1,216 +1,240 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, BookOpen, DollarSign, TrendingUp, CheckCircle, Target, Clock } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import {
+  ArrowLeft,
+  Clock,
+  TrendingUp,
+  Wallet,
+  BookOpen,
+  Library,
+} from 'lucide-react';
 import { getCareerById, getLearningRoadmap } from '../lib/api';
+import { Card, Badge, Button, Skeleton, ErrorState } from './ui';
+import CareerResources from './Resources';
 
-const CareerDetails = () => {
+function formatSalary(range) {
+  if (!range?.min || !range?.max) return 'Not published';
+  const fmt = (n) => n.toLocaleString('en-US', { maximumFractionDigits: 0 });
+  return `${range.currency || 'USD'} ${fmt(range.min)} – ${fmt(range.max)}`;
+}
+
+/** Stat tile. Label above, value below, icon decorative. */
+function Stat({ icon: Icon, label, value }) {
+  return (
+    <Card className="p-5">
+      <div className="flex items-center gap-2 text-muted-foreground">
+        <Icon className="h-4 w-4" aria-hidden="true" />
+        <span className="text-sm font-medium">{label}</span>
+      </div>
+      <p className="mt-2 text-lg font-bold text-foreground">{value}</p>
+    </Card>
+  );
+}
+
+export default function CareerDetails() {
   const { id } = useParams();
   const [career, setCareer] = useState(null);
   const [roadmap, setRoadmap] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  useEffect(() => {
-    loadCareerDetails();
+  const load = React.useCallback(() => {
+    setError(null);
+    setCareer(null);
+    setRoadmap(null);
+    getCareerById(id)
+      .then(setCareer)
+      .catch((err) => setError(err.message));
+    // The roadmap may call the model, so it loads independently — the page
+    // body does not wait on it.
+    getLearningRoadmap(id)
+      .then(setRoadmap)
+      .catch(() => setRoadmap({ roadmap: [] }));
   }, [id]);
 
-  const loadCareerDetails = async () => {
-    try {
-      setLoading(true);
-      const careerData = await getCareerById(id);
-      console.log('Career data:', careerData);
-      setCareer(careerData);
-      
-      // Use career's learning_path as a fallback roadmap first
-      if (careerData && careerData.learning_path) {
-        setRoadmap({
-          career: careerData.title,
-          roadmap: careerData.learning_path,
-          required_skills: careerData.required_skills || [],
-          preferred_skills: careerData.preferred_skills || [],
-          estimated_time: "6-12 months",
-          difficulty: "Intermediate to Advanced"
-        });
-      }
+  useEffect(load, [load]);
 
-      // Then, try to fetch the enhanced roadmap from the API
-      try {
-        const roadmapData = await getLearningRoadmap(id);
-        console.log('Roadmap data:', roadmapData);
-        setRoadmap(roadmapData); // This will overwrite the fallback if successful
-      } catch (roadmapError) {
-        console.error('Could not load enhanced roadmap, using default.', roadmapError);
-      }
-
-    } catch (error) {
-      console.error('Error loading career details:', error);
-      alert(`Error loading career: ${error.message || 'Unknown error'}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading) {
+  if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading career details...</p>
-        </div>
+      <div className="space-y-5">
+        <ErrorState message={error} onRetry={load} />
+        <Button as={Link} to="/careers" variant="outline">
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          Back to all careers
+        </Button>
       </div>
     );
   }
 
   if (!career) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-600 mb-4">Career not found.</p>
-          <Link to="/careers" className="text-blue-600 hover:underline">
-            Browse all careers
-          </Link>
+      <div className="space-y-5">
+        <Skeleton className="h-10 w-2/3" />
+        <Skeleton className="h-24" />
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Skeleton className="h-24" />
+          <Skeleton className="h-24" />
+          <Skeleton className="h-24" />
         </div>
+        <Skeleton className="h-72" />
       </div>
     );
   }
 
-  const getCategoryColor = (category) => {
-    const colors = {
-      'Software Development': 'bg-blue-100 text-blue-800',
-      'AI/ML': 'bg-purple-100 text-purple-800',
-      'Data': 'bg-green-100 text-green-800',
-      'Cloud/DevOps': 'bg-orange-100 text-orange-800',
-      'Cybersecurity': 'bg-red-100 text-red-800',
-      'Other': 'bg-indigo-100 text-indigo-800'
-    };
-    return colors[category] || 'bg-gray-100 text-gray-800';
-  };
+  const steps = roadmap?.roadmap ?? [];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 py-12">
-      <div className="container mx-auto px-4 max-w-5xl">
-        {/* Back Button */}
-        <Link
-          to="/careers"
-          className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-6"
+    <div className="space-y-8">
+      <Button as={Link} to="/careers" variant="ghost" size="sm" className="-ml-3">
+        <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+        All careers
+      </Button>
+
+      <header>
+        <Badge tone="primary">{career.category}</Badge>
+        <h1 className="mt-4 text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
+          {career.title}
+        </h1>
+        <p className="mt-4 max-w-3xl text-lg leading-relaxed text-muted-foreground">
+          {career.description}
+        </p>
+      </header>
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Stat
+          icon={Wallet}
+          label="Salary range"
+          value={formatSalary(career.salary_range)}
+        />
+        <Stat
+          icon={TrendingUp}
+          label="Growth score"
+          value={`${career.growth_potential ?? '—'}/100`}
+        />
+        <Stat
+          icon={Clock}
+          label="Time to job-ready"
+          value={roadmap?.estimated_time ?? '6–12 months'}
+        />
+      </div>
+
+      <section aria-labelledby="skills-heading">
+        <h2
+          id="skills-heading"
+          className="text-2xl font-bold tracking-tight text-foreground"
         >
-          <ArrowLeft className="h-5 w-5" />
-          Back to Careers
-        </Link>
-
-        {/* Career Header */}
-        <div className="bg-white rounded-xl shadow-lg p-8 mb-8">
-          <div className="flex items-start justify-between mb-6">
-            <div className="flex-1">
-              <h1 className="text-4xl font-bold text-gray-900 mb-4">{career.title}</h1>
-              <span className={`inline-block px-4 py-2 rounded-full text-sm font-semibold ${getCategoryColor(career.category)}`}>
-                {career.category}
-              </span>
-            </div>
-          </div>
-
-          <p className="text-lg text-gray-700 mb-8 leading-relaxed">{career.description}</p>
-
-          {/* Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-green-50 p-6 rounded-lg">
-              <DollarSign className="h-8 w-8 text-green-600 mb-3" />
-              <p className="text-sm text-gray-600 mb-1">Salary Range</p>
-              <p className="text-2xl font-bold text-gray-900">
-                ${(career.salary_range.min / 1000).toFixed(0)}k - ${(career.salary_range.max / 1000).toFixed(0)}k
+          Skills
+        </h2>
+        <div className="mt-5 grid gap-5 sm:grid-cols-2">
+          <Card className="p-5">
+            <h3 className="text-sm font-bold text-foreground">Required</h3>
+            <ul className="mt-3 flex flex-wrap gap-1.5">
+              {(career.required_skills || []).map((s) => (
+                <li key={s}>
+                  <Badge tone="primary">{s}</Badge>
+                </li>
+              ))}
+            </ul>
+          </Card>
+          <Card className="p-5">
+            <h3 className="text-sm font-bold text-foreground">
+              Nice to have
+            </h3>
+            {career.preferred_skills?.length ? (
+              <ul className="mt-3 flex flex-wrap gap-1.5">
+                {career.preferred_skills.map((s) => (
+                  <li key={s}>
+                    <Badge>{s}</Badge>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-3 text-sm text-muted-foreground">
+                Nothing listed.
               </p>
-            </div>
-
-            <div className="bg-purple-50 p-6 rounded-lg">
-              <TrendingUp className="h-8 w-8 text-purple-600 mb-3" />
-              <p className="text-sm text-gray-600 mb-1">Growth Potential</p>
-              <p className="text-2xl font-bold text-gray-900">{career.growth_potential}%</p>
-            </div>
-
-            <div className="bg-blue-50 p-6 rounded-lg">
-              <Target className="h-8 w-8 text-blue-600 mb-3" />
-              <p className="text-sm text-gray-600 mb-1">Required Skills</p>
-              <p className="text-2xl font-bold text-gray-900">{career.required_skills.length}</p>
-            </div>
-          </div>
+            )}
+          </Card>
         </div>
+      </section>
 
-        {/* Required Skills */}
-        <div className="bg-white rounded-xl shadow-lg p-8 mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Required Skills</h2>
-          <div className="flex flex-wrap gap-3">
-            {career.required_skills.map((skill, idx) => (
-              <span
-                key={idx}
-                className="px-4 py-2 bg-blue-100 text-blue-800 rounded-lg font-medium"
-              >
-                {skill}
-              </span>
+      <section aria-labelledby="roadmap-heading">
+        <h2
+          id="roadmap-heading"
+          className="flex items-center gap-2 text-2xl font-bold tracking-tight text-foreground"
+        >
+          <BookOpen className="h-6 w-6 text-primary" aria-hidden="true" />
+          Learning roadmap
+        </h2>
+
+        {roadmap === null ? (
+          <div className="mt-5 space-y-3">
+            {Array.from({ length: 5 }, (_, i) => (
+              <Skeleton key={i} className="h-20" />
             ))}
           </div>
-        </div>
-
-        {/* Preferred Skills */}
-        {career.preferred_skills && career.preferred_skills.length > 0 && (
-          <div className="bg-white rounded-xl shadow-lg p-8 mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Preferred Skills</h2>
-            <div className="flex flex-wrap gap-3">
-              {career.preferred_skills.map((skill, idx) => (
-                <span
-                  key={idx}
-                  className="px-4 py-2 bg-purple-100 text-purple-800 rounded-lg font-medium"
-                >
-                  {skill}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Learning Roadmap */}
-        {roadmap && (
-          <div className="bg-white rounded-xl shadow-lg p-8 mb-8">
-            <div className="flex items-center gap-3 mb-6">
-              <BookOpen className="h-8 w-8 text-purple-600" />
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">Learning Roadmap</h2>
-                <p className="text-gray-600">
-                  {roadmap.estimated_time} • {roadmap.difficulty}
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              {roadmap.roadmap.map((step, idx) => (
-                <div key={idx} className="flex items-start gap-4 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg">
-                  <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold">
-                    {idx + 1}
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-gray-900 font-medium">{step}</p>
-                  </div>
-                  <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0" />
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* CTA */}
-        <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl shadow-lg p-8 text-center">
-          <h2 className="text-2xl font-bold mb-4">Ready to Start This Career Path?</h2>
-          <p className="text-blue-100 mb-6">
-            Get personalized recommendations and start your learning journey today
+        ) : steps.length === 0 ? (
+          <p className="mt-4 text-muted-foreground">
+            No roadmap published for this career yet.
           </p>
-          <Link
-            to="/profile"
-            className="inline-block bg-white text-purple-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors"
-          >
-            Create Your Profile
-          </Link>
+        ) : (
+          <ol className="mt-5 space-y-3">
+            {steps.map((step, i) => {
+              // The endpoint returns plain strings without a key, and
+              // structured objects when the AI pass succeeded.
+              const structured = typeof step === 'object' && step !== null;
+              const title = structured ? step.title : step;
+              return (
+                <li key={i}>
+                  <Card className="flex gap-4 p-5">
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-sm font-extrabold text-primary">
+                      {structured ? step.step : i + 1}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-bold text-foreground">{title}</h3>
+                      {structured && step.description && (
+                        <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+                          {step.description}
+                        </p>
+                      )}
+                      {structured && (step.duration || step.resources?.length) && (
+                        <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                          {step.duration && (
+                            <Badge tone="accent">{step.duration}</Badge>
+                          )}
+                          {(step.resources || []).map((r) => (
+                            <Badge key={r}>{r}</Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </Card>
+                </li>
+              );
+            })}
+          </ol>
+        )}
+      </section>
+
+      <section aria-labelledby="resources-heading">
+        <h2
+          id="resources-heading"
+          className="flex items-center gap-2 text-2xl font-bold tracking-tight text-foreground"
+        >
+          <Library className="h-6 w-6 text-primary" aria-hidden="true" />
+          Where to learn this
+        </h2>
+        <CareerResources careerId={id} />
+      </section>
+
+      <Card glass className="p-6 text-center">
+        <p className="text-muted-foreground">
+          Want to know how close you already are?
+        </p>
+        <div className="mt-4 flex justify-center">
+          <Button as={Link} to="/profile" variant="accent">
+            Check my match for this role
+          </Button>
         </div>
-      </div>
+      </Card>
     </div>
   );
-};
-
-export default CareerDetails;
+}

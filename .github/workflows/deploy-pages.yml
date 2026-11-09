@@ -1,0 +1,66 @@
+name: Deploy frontend to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# A queued deploy should wait for the running one rather than cancel it,
+# so Pages is never left serving a half-published build.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci --legacy-peer-deps
+
+      - name: Build
+        working-directory: frontend
+        env:
+          CI: true
+          # Points the built UI at the deployed API. Set REACT_APP_API_URL as
+          # a repository variable once the backend is live; until then the
+          # build falls back to localhost and the UI shows "API offline".
+          REACT_APP_API_URL: ${{ vars.REACT_APP_API_URL }}
+        run: npm run build
+
+      - name: Add SPA fallback
+        working-directory: frontend
+        # Pages serves static files only, so a deep link like /careers/x
+        # would 404. Serving index.html for unknown paths lets the router
+        # resolve them client-side.
+        run: cp build/index.html build/404.html
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: frontend/build
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

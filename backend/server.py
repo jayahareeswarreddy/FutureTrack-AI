@@ -1,17 +1,29 @@
 """
-FastAPI Backend for AI Career Path Recommender
-Uses OpenAI GPT-4o-mini via Emergent LLM for AI recommendations
+FastAPI backend for the FutureTrack AI career recommender.
+
+Match scores are computed deterministically in Python. An LLM (Groq by
+default, OpenAI optionally) writes the explanations, roadmap detail and
+skill-gap summaries, and every generation is JSON-schema validated with
+retries before it reaches a client. With no key configured the service falls
+back to rule-based text and stays fully functional.
 """
+
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 import motor.motor_asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 import os
+import re
 from dotenv import load_dotenv
-# OpenAI will be imported in the function if needed
+
+import ai_client
+from ai_client import AIUnavailable
+from resources import get_resources_for_career, get_resources_for_skill
+from schemas import REASONING_SCHEMA, ROADMAP_SCHEMA, SKILL_GAP_SCHEMA
 
 load_dotenv()
 
@@ -22,9 +34,21 @@ app = FastAPI(
 )
 
 # CORS middleware
+DEFAULT_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://localhost:3001",
+]
+# Comma-separated list of production origins, set in the hosting dashboard.
+ALLOWED_ORIGINS = [
+    o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()
+] or DEFAULT_ORIGINS
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173", "http://localhost:3001"],
+    allow_origins=ALLOWED_ORIGINS,
+    # Vercel gives every preview build its own subdomain.
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -42,13 +66,10 @@ try:
     db = client.career_path_db
     careers_collection = db.careers
     users_collection = db.users
-    print("✅ MongoDB connection initialized")
+    print("[ok] MongoDB connection initialized")
 except Exception as e:
-    print(f"⚠️ MongoDB not available, using in-memory data: {e}")
+    print(f"[warn] MongoDB not available, using in-memory data: {e}")
     client = None
-
-# OpenAI configuration
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
 # Pydantic models
 class UserProfile(BaseModel):
@@ -62,6 +83,7 @@ class UserProfile(BaseModel):
 
 class CareerRecommendation(BaseModel):
     career: str
+    career_id: str
     match_score: float
     reasoning: str
     required_skills: List[str]
@@ -72,6 +94,26 @@ class CareerRecommendation(BaseModel):
 class RecommendationResponse(BaseModel):
     recommendations: List[CareerRecommendation]
     user_profile_summary: str
+
+class SkillGapRequest(BaseModel):
+    career_id: str
+    skills: List[str] = []
+    experience_years: int = 0
+
+class SkillGapResponse(BaseModel):
+    career: str
+    career_id: str
+    coverage: float
+    skills_matched: List[str]
+    skills_missing: List[str]
+    preferred_skills_matched: List[str]
+    priority_order: List[str]
+    estimated_months: float
+    summary: str
+    ai_generated: bool
+
+# Profiles saved without a database live here for the life of the process.
+PROFILE_CACHE: dict = {}
 
 # Comprehensive Career Database (24+ Paths)
 CAREER_DATABASE = [
@@ -523,21 +565,27 @@ async def root():
         "status": "running"
     }
 
-@app.on_event("startup")
-async def startup_event():
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """Seed the career collection on boot, then hand control to the app."""
     """Initialize database with career data"""
     try:
         if careers_collection is not None:
             count = await careers_collection.count_documents({})
             if count == 0:
                 await careers_collection.insert_many(CAREER_DATABASE)
-                print(f"✅ Initialized {len(CAREER_DATABASE)} careers in database")
+                print(f"[ok] Initialized {len(CAREER_DATABASE)} careers in database")
             else:
-                print(f"✅ Database already has {count} careers")
+                print(f"[ok] Database already has {count} careers")
         else:
-            print(f"✅ Using in-memory career database ({len(CAREER_DATABASE)} careers)")
+            print(f"[ok] Using in-memory career database ({len(CAREER_DATABASE)} careers)")
     except Exception as e:
-        print(f"⚠️ Database initialization error, using in-memory data: {e}")
+        print(f"[warn] Database initialization error, using in-memory data: {e}")
+    yield
+
+
+app.router.lifespan_context = lifespan
+
 
 @app.get("/careers")
 async def get_all_careers():
@@ -552,68 +600,42 @@ async def get_all_careers():
                     for career in careers:
                         if '_id' in career:
                             career.pop('_id', None)
-                    print(f"✅ Returning {len(careers)} careers from database")
+                    print(f"[ok] Returning {len(careers)} careers from database")
                     return careers
             except Exception as db_error:
-                print(f"⚠️ Database error, using in-memory data: {db_error}")
+                print(f"[warn] Database error, using in-memory data: {db_error}")
         
         # Fallback to in-memory database
-        print(f"✅ Returning {len(CAREER_DATABASE)} careers from in-memory database")
+        print(f"[ok] Returning {len(CAREER_DATABASE)} careers from in-memory database")
         return CAREER_DATABASE
     except Exception as e:
-        print(f"❌ Error fetching careers: {e}")
+        print(f"[error] Error fetching careers: {e}")
         import traceback
         traceback.print_exc()
         # Always return in-memory data as fallback
         return CAREER_DATABASE
-
-@app.get("/careers/{career_id}")
-async def get_career(career_id: str):
-    """Get specific career details"""
-    try:
-        career = None
-        if careers_collection is not None:
-            try:
-                career = await careers_collection.find_one({"id": career_id})
-                if career and '_id' in career:
-                    career.pop('_id', None)
-            except Exception as db_error:
-                print(f"⚠️ Database error in get_career, falling back to in-memory: {db_error}")
-
-        if career is None:
-            # Fallback to in-memory database
-            print(f"Searching for career {career_id} in-memory")
-            career = next((c for c in CAREER_DATABASE if c["id"] == career_id), None)
-
-        if career is None:
-            print(f"❌ Career with id {career_id} not found anywhere.")
-            raise HTTPException(status_code=404, detail="Career not found")
-        
-        print(f"✅ Successfully found career: {career.get('title')}")
-        return career
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"❌ Unexpected error in get_career: {e}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
 
 @app.get("/careers/search")
 async def search_careers(q: str = ""):
     """Search careers by query"""
     try:
         careers = []
+        # A raw query string is not a safe regex: "C++" or "(" would raise.
+        safe_q = re.escape(q) if q else ""
         if careers_collection is not None:
             query = {
                 "$or": [
-                    {"title": {"$regex": q, "$options": "i"}},
-                    {"description": {"$regex": q, "$options": "i"}},
-                    {"category": {"$regex": q, "$options": "i"}},
-                    {"required_skills": {"$regex": q, "$options": "i"}}
+                    {"title": {"$regex": safe_q, "$options": "i"}},
+                    {"description": {"$regex": safe_q, "$options": "i"}},
+                    {"category": {"$regex": safe_q, "$options": "i"}},
+                    {"required_skills": {"$regex": safe_q, "$options": "i"}}
                 ]
             } if q else {}
             careers = await careers_collection.find(query).to_list(length=50)
+            # Mongo's ObjectId is not JSON serialisable, so drop it before
+            # the response is encoded.
+            for c in careers:
+                c.pop("_id", None)
 
         if not careers:
             # Fallback search
@@ -626,6 +648,38 @@ async def search_careers(q: str = ""):
         print(f"Error searching careers, falling back to in-memory: {e}")
         return [c for c in CAREER_DATABASE if q.lower() in c["title"].lower() or 
                 q.lower() in c["description"].lower()]
+
+@app.get("/careers/{career_id}")
+async def get_career(career_id: str):
+    """Get specific career details"""
+    try:
+        career = None
+        if careers_collection is not None:
+            try:
+                career = await careers_collection.find_one({"id": career_id})
+                if career and '_id' in career:
+                    career.pop('_id', None)
+            except Exception as db_error:
+                print(f"[warn] Database error in get_career, falling back to in-memory: {db_error}")
+
+        if career is None:
+            # Fallback to in-memory database
+            print(f"Searching for career {career_id} in-memory")
+            career = next((c for c in CAREER_DATABASE if c["id"] == career_id), None)
+
+        if career is None:
+            print(f"[error] Career with id {career_id} not found anywhere.")
+            raise HTTPException(status_code=404, detail="Career not found")
+        
+        print(f"[ok] Successfully found career: {career.get('title')}")
+        return career
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[error] Unexpected error in get_career: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
 
 @app.post("/recommendations", response_model=RecommendationResponse)
 async def get_recommendations(profile: UserProfile):
@@ -661,6 +715,7 @@ async def get_recommendations(profile: UserProfile):
                 
                 recommendations.append({
                     "career": career["title"],
+                    "career_id": career["id"],
                     "match_score": match_score,
                     "reasoning": reasoning,
                     "required_skills": career.get("required_skills", []),
@@ -680,6 +735,7 @@ async def get_recommendations(profile: UserProfile):
             top_recommendations = [
                 {
                     "career": career["title"],
+                    "career_id": career["id"],
                     "match_score": 0.5,
                     "reasoning": f"This is a popular career path in {career['category']} that you might be interested in.",
                     "required_skills": career.get("required_skills", []),
@@ -704,45 +760,49 @@ async def get_recommendations(profile: UserProfile):
         raise HTTPException(status_code=500, detail=f"Error generating recommendations: {str(e)}")
 
 async def generate_ai_reasoning(profile: UserProfile, career: dict, score: float) -> str:
-    """Generate AI-powered reasoning using OpenAI ChatGPT API"""
-    try:
-        if not OPENAI_API_KEY:
-            # Fallback to rule-based reasoning
-            return generate_rule_based_reasoning(profile, career, score)
-        
-        prompt = f"""Analyze why this career path matches the user profile and provide a brief, personalized explanation (2-3 sentences).
+    """
+    Personalised reasoning from the configured LLM, schema-validated with retries.
 
-User Profile:
-- Skills: {', '.join(profile.skills[:10])}
-- Interests: {', '.join(profile.interests[:5])}
-- Experience: {profile.experience_years} years
-- Education: {profile.education_level}
-- Goals: {profile.goals}
-
-Career: {career['title']}
-Category: {career['category']}
-Required Skills: {', '.join(career.get('required_skills', [])[:5])}
-Match Score: {score:.0%}
-
-Provide a personalized explanation of why this career is a good fit:"""
-        
-        from openai import OpenAI
-        client = OpenAI(api_key=OPENAI_API_KEY)
-        
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",  # Using ChatGPT model
-            messages=[
-                {"role": "system", "content": "You are a career guidance expert providing personalized career recommendations."},
-                {"role": "user", "content": prompt}
-            ],
-            max_tokens=150,
-            temperature=0.7
-        )
-        
-        return response.choices[0].message.content.strip()
-    except Exception as e:
-        print(f"OpenAI API error: {e}")
+    Falls back to the deterministic rule-based explanation when the key is
+    absent or every retry is exhausted, so this never fails a request.
+    """
+    if not ai_client.is_configured():
         return generate_rule_based_reasoning(profile, career, score)
+
+    system = (
+        "You are a career guidance expert. You explain why a specific career "
+        "path fits a candidate, concretely and without flattery."
+    )
+    user = f"""Explain in 2-3 sentences why this career matches this profile.
+
+User profile
+- Skills: {', '.join(profile.skills[:10]) or 'none given'}
+- Interests: {', '.join(profile.interests[:5]) or 'none given'}
+- Experience: {profile.experience_years} years
+- Education: {profile.education_level or 'not given'}
+- Goals: {profile.goals or 'not given'}
+
+Career: {career['title']} ({career['category']})
+Required skills: {', '.join(career.get('required_skills', [])[:6])}
+Computed match score: {score:.0%}
+
+Reference the candidate's actual skills. Do not invent experience they did
+not list."""
+
+    ai_client.stats.calls += 1
+    try:
+        result = await ai_client.generate_validated(
+            system=system,
+            user=user,
+            schema=REASONING_SCHEMA,
+            on_attempt=lambda n, err: ai_client.stats.record_attempt(err),
+        )
+        return result["reasoning"].strip()
+    except AIUnavailable as exc:
+        ai_client.stats.failures += 1
+        print(f"AI reasoning unavailable, using rule-based: {exc}")
+        return generate_rule_based_reasoning(profile, career, score)
+
 
 def generate_rule_based_reasoning(profile: UserProfile, career: dict, score: float) -> str:
     """Generate rule-based reasoning when AI is not available"""
@@ -830,7 +890,7 @@ async def get_learning_roadmap(career_id: str):
         # Get enhanced roadmap using ChatGPT if API key is available
         roadmap_steps = career.get("learning_path", [])
         
-        if OPENAI_API_KEY and roadmap_steps:
+        if ai_client.is_configured() and roadmap_steps:
             try:
                 enhanced_roadmap = await enhance_roadmap_with_ai(career, roadmap_steps)
                 roadmap_steps = enhanced_roadmap
@@ -854,40 +914,305 @@ async def get_learning_roadmap(career_id: str):
         raise HTTPException(status_code=500, detail=f"Error generating roadmap: {str(e)}")
 
 async def enhance_roadmap_with_ai(career: dict, base_roadmap: list) -> list:
-    """Enhance roadmap with AI-generated detailed steps"""
-    try:
-        if not OPENAI_API_KEY:
-            return base_roadmap
-        
-        from openai import OpenAI
-        client = OpenAI(api_key=OPENAI_API_KEY)
-        
-        prompt = f"""For the career path "{career['title']}" in {career['category']}, provide a detailed learning roadmap.
-        
-Base steps:
-{chr(10).join(f"- {step}" for step in base_roadmap)}
+    """
+    Expand a roadmap into structured, validated steps.
 
-Provide the same roadmap but with more detailed, actionable steps. Return only the steps, one per line, without numbering."""
-        
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "You are an educational expert providing detailed learning roadmaps."},
-                {"role": "user", "content": prompt}
-            ],
-            max_tokens=500,
-            temperature=0.7
-        )
-        
-        ai_roadmap = response.choices[0].message.content.strip()
-        # Parse the AI response into a list
-        enhanced_steps = [step.strip().lstrip('- ').strip() for step in ai_roadmap.split('\n') if step.strip()]
-        
-        return enhanced_steps if enhanced_steps else base_roadmap
-    except Exception as e:
-        print(f"AI roadmap enhancement error: {e}")
+    Returns a list of dicts with step/title/description/duration/resources.
+    On any failure the plain-string base roadmap is returned unchanged, so the
+    endpoint's response shape stays predictable for the client.
+    """
+    if not ai_client.is_configured():
         return base_roadmap
+
+    system = (
+        "You are an educational expert who turns coarse learning paths into "
+        "detailed, actionable, correctly ordered steps."
+    )
+    steps_text = chr(10).join(f"- {s}" for s in base_roadmap)
+    user = f"""Expand this learning roadmap for a {career['title']} in {career['category']}.
+
+Base steps:
+{steps_text}
+
+Keep the same overall progression. For each step give a title, a one-sentence
+description, a realistic duration, and up to three concrete resource types."""
+
+    ai_client.stats.calls += 1
+    try:
+        result = await ai_client.generate_validated(
+            system=system,
+            user=user,
+            schema=ROADMAP_SCHEMA,
+            on_attempt=lambda n, err: ai_client.stats.record_attempt(err),
+        )
+        return result["steps"]
+    except AIUnavailable as exc:
+        ai_client.stats.failures += 1
+        print(f"AI roadmap enhancement unavailable, using base roadmap: {exc}")
+        return base_roadmap
+
+
+# ==========================================================================
+# Endpoints 7-12. The six above cover careers and recommendations; these add
+# observability, taxonomy, skill-gap analysis and profile persistence.
+# ==========================================================================
+
+async def _find_career(career_id: str):
+    """Look up one career: MongoDB first, then the in-memory catalogue."""
+    if careers_collection is not None:
+        try:
+            found = await careers_collection.find_one({"id": career_id})
+            if found:
+                found.pop("_id", None)
+                return found
+        except Exception as exc:
+            print(f"Database error during career lookup, using in-memory: {exc}")
+    return next((c for c in CAREER_DATABASE if c["id"] == career_id), None)
+
+
+@app.get("/careers/{career_id}/resources")
+async def get_career_resources(career_id: str):
+    """
+    Curated learning material for a career, grouped by required skill.
+
+    Official documentation, free books and courses are exact URLs; video
+    entries are YouTube searches rather than pinned video IDs, so they do not
+    rot when an uploader removes a video.
+    """
+    career = await _find_career(career_id)
+    if career is None:
+        raise HTTPException(
+            status_code=404, detail=f"Career with id '{career_id}' not found"
+        )
+    return get_resources_for_career(career)
+
+
+@app.get("/resources")
+async def get_resources(skill: str):
+    """Resources for a single named skill, for the skill-gap panel."""
+    if not skill.strip():
+        raise HTTPException(status_code=422, detail="skill must not be empty")
+    return {"skill": skill, "resources": get_resources_for_skill(skill)}
+
+
+@app.get("/health")
+async def health_check():
+    """
+    Readiness probe. Reports which optional dependencies actually resolved,
+    plus AI retry counters, so a deployed instance can be diagnosed from
+    outside without reading logs.
+    """
+    mongo_ok = False
+    mongo_detail = "not configured"
+    if client is not None:
+        try:
+            await client.admin.command("ping")
+            mongo_ok = True
+            mongo_detail = "connected"
+        except Exception as exc:
+            mongo_detail = f"unreachable: {type(exc).__name__}"
+
+    return {
+        "status": "healthy",
+        "version": app.version,
+        "dependencies": {
+            "mongodb": {"ok": mongo_ok, "detail": mongo_detail},
+            "ai": {
+                "ok": ai_client.is_configured(),
+                **ai_client.describe_provider(),
+                "detail": "configured" if ai_client.is_configured()
+                          else f"{ai_client.provider_config()['env_key']} not set "
+                               "- rule-based fallback active",
+            },
+        },
+        "careers_available": len(CAREER_DATABASE),
+        "ai_metrics": ai_client.stats.as_dict(),
+    }
+
+
+@app.get("/categories")
+async def list_categories():
+    """Career categories with counts, for building filter UI."""
+    counts: dict = {}
+    for career in CAREER_DATABASE:
+        category = career.get("category", "Uncategorised")
+        counts.setdefault(category, []).append(career["title"])
+
+    return {
+        "total_categories": len(counts),
+        "categories": [
+            {"name": name, "career_count": len(titles), "careers": sorted(titles)}
+            for name, titles in sorted(counts.items())
+        ],
+    }
+
+
+@app.get("/skills")
+async def list_skills(limit: int = 100):
+    """
+    Skill catalogue aggregated across every career, most in-demand first.
+    Powers autocomplete on the profile form.
+    """
+    if limit < 1 or limit > 500:
+        raise HTTPException(status_code=422, detail="limit must be between 1 and 500")
+
+    demand: dict = {}
+    for career in CAREER_DATABASE:
+        for skill in career.get("required_skills", []):
+            entry = demand.setdefault(skill, {"required_by": 0, "preferred_by": 0})
+            entry["required_by"] += 1
+        for skill in career.get("preferred_skills", []):
+            entry = demand.setdefault(skill, {"required_by": 0, "preferred_by": 0})
+            entry["preferred_by"] += 1
+
+    ranked = sorted(
+        (
+            {
+                "skill": name,
+                "required_by": v["required_by"],
+                "preferred_by": v["preferred_by"],
+                "demand_score": v["required_by"] * 2 + v["preferred_by"],
+            }
+            for name, v in demand.items()
+        ),
+        key=lambda s: (-s["demand_score"], s["skill"]),
+    )
+
+    return {"total_skills": len(ranked), "skills": ranked[:limit]}
+
+
+@app.post("/skill-gap", response_model=SkillGapResponse)
+async def analyse_skill_gap(request: SkillGapRequest):
+    """
+    Compare a profile's skills against one career's requirements and return
+    what is already covered, what is missing, and a prioritised plan.
+    """
+    career = next(
+        (c for c in CAREER_DATABASE if c["id"] == request.career_id), None
+    )
+    if career is None:
+        raise HTTPException(
+            status_code=404, detail=f"Career with id '{request.career_id}' not found"
+        )
+
+    owned = {s.strip().lower() for s in request.skills if s.strip()}
+    required = career.get("required_skills", [])
+    preferred = career.get("preferred_skills", [])
+
+    have = [s for s in required if s.lower() in owned]
+    missing = [s for s in required if s.lower() not in owned]
+    bonus = [s for s in preferred if s.lower() in owned]
+
+    coverage = len(have) / len(required) if required else 0.0
+
+    summary = (
+        f"You cover {len(have)} of {len(required)} required skills for "
+        f"{career['title']} ({coverage:.0%}). "
+        + (
+            f"The gap is: {', '.join(missing)}."
+            if missing
+            else "You meet every listed requirement."
+        )
+    )
+    priority = missing[:]
+    estimated_months = round(len(missing) * 1.5, 1)
+
+    # Optional AI pass. Deterministic numbers above are never overwritten,
+    # only the prose summary and ordering are improved.
+    if ai_client.is_configured() and missing:
+        ai_client.stats.calls += 1
+        try:
+            result = await ai_client.generate_validated(
+                system=(
+                    "You are a technical mentor. You advise on the order to "
+                    "learn missing skills and how long it realistically takes."
+                ),
+                user=(
+                    f"Target career: {career['title']} ({career['category']})\n"
+                    f"Already has: {', '.join(have) or 'nothing from the list'}\n"
+                    f"Missing: {', '.join(missing)}\n"
+                    f"Experience: {request.experience_years} years\n\n"
+                    "Give a short summary, the missing skills in the order they "
+                    "should be learned, and an estimate in months."
+                ),
+                schema=SKILL_GAP_SCHEMA,
+                on_attempt=lambda n, err: ai_client.stats.record_attempt(err),
+            )
+            summary = result["summary"].strip()
+            ai_order = [s for s in result.get("priority_order", []) if s in missing]
+            if ai_order:
+                priority = ai_order + [s for s in missing if s not in ai_order]
+            if result.get("estimated_months"):
+                estimated_months = float(result["estimated_months"])
+        except AIUnavailable as exc:
+            ai_client.stats.failures += 1
+            print(f"AI skill-gap unavailable, using rule-based: {exc}")
+
+    return {
+        "career": career["title"],
+        "career_id": career["id"],
+        "coverage": round(coverage, 3),
+        "skills_matched": have,
+        "skills_missing": missing,
+        "preferred_skills_matched": bonus,
+        "priority_order": priority,
+        "estimated_months": estimated_months,
+        "summary": summary,
+        "ai_generated": ai_client.is_configured() and bool(missing),
+    }
+
+
+@app.post("/profiles", status_code=201)
+async def save_profile(profile: UserProfile):
+    """
+    Persist a profile so a result can be revisited by id. Writes to MongoDB
+    when it is reachable and to an in-process store otherwise, so the demo
+    works on a host with no database attached.
+    """
+    import uuid
+
+    profile_id = uuid.uuid4().hex[:12]
+    record = {
+        "profile_id": profile_id,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "profile": profile.model_dump(),
+    }
+
+    stored_in = "memory"
+    if users_collection is not None:
+        try:
+            await users_collection.insert_one(dict(record))
+            stored_in = "mongodb"
+        except Exception as exc:
+            print(f"Profile write to MongoDB failed, keeping in memory: {exc}")
+
+    PROFILE_CACHE[profile_id] = record
+    return {"profile_id": profile_id, "stored_in": stored_in, **record}
+
+
+@app.get("/profiles/{profile_id}")
+async def get_profile(profile_id: str):
+    """Retrieve a saved profile together with fresh recommendations."""
+    record = PROFILE_CACHE.get(profile_id)
+
+    if record is None and users_collection is not None:
+        try:
+            found = await users_collection.find_one({"profile_id": profile_id})
+            if found:
+                found.pop("_id", None)
+                record = found
+        except Exception as exc:
+            print(f"Profile read from MongoDB failed: {exc}")
+
+    if record is None:
+        raise HTTPException(
+            status_code=404, detail=f"Profile '{profile_id}' not found"
+        )
+
+    recommendations = await get_recommendations(UserProfile(**record["profile"]))
+    return {**record, "recommendations": recommendations["recommendations"]}
+
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", "8000")))

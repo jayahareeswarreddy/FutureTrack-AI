@@ -1,229 +1,204 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, Filter, ArrowRight, TrendingUp, DollarSign } from 'lucide-react';
-import { getCareers, searchCareers } from '../lib/api';
+import { Search, ArrowRight, X } from 'lucide-react';
+import { getCareers, getCategories } from '../lib/api';
+import {
+  Card,
+  Badge,
+  Button,
+  Skeleton,
+  ErrorState,
+  EmptyState,
+  inputClasses,
+  cx,
+} from './ui';
 
-const CareerBrowser = () => {
-  const [careers, setCareers] = useState([]);
-  const [filteredCareers, setFilteredCareers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('all');
+export default function CareerBrowser() {
+  const [careers, setCareers] = useState(null);
+  const [categories, setCategories] = useState([]);
+  const [error, setError] = useState(null);
+  const [query, setQuery] = useState('');
+  const [activeCategory, setActiveCategory] = useState('All');
 
-  const categories = ['all', 'Software Development', 'AI/ML', 'Data', 'Cloud/DevOps', 'Cybersecurity', 'Other'];
-
-  useEffect(() => {
-    loadCareers();
+  const load = React.useCallback(() => {
+    setError(null);
+    setCareers(null);
+    Promise.all([getCareers(), getCategories().catch(() => null)])
+      .then(([careerList, categoryData]) => {
+        setCareers(careerList);
+        setCategories(categoryData?.categories?.map((c) => c.name) ?? []);
+      })
+      .catch((err) => setError(err.message));
   }, []);
 
-  useEffect(() => {
-    filterCareers();
-  }, [searchQuery, selectedCategory, careers]);
+  useEffect(load, [load]);
 
-  const loadCareers = async () => {
-    try {
-      setLoading(true);
-      const data = await getCareers();
-      console.log('Loaded careers:', data?.length || 0);
-      if (data && Array.isArray(data) && data.length > 0) {
-        setCareers(data);
-        setFilteredCareers(data);
-      } else {
-        console.error('No careers data received');
-        // Retry once after a delay
-        setTimeout(async () => {
-          try {
-            const retryData = await getCareers();
-            if (retryData && Array.isArray(retryData) && retryData.length > 0) {
-              setCareers(retryData);
-              setFilteredCareers(retryData);
-            }
-          } catch (retryError) {
-            console.error('Retry failed:', retryError);
-          }
-        }, 2000);
-      }
-    } catch (error) {
-      console.error('Error loading careers:', error);
-      alert('Failed to load careers. Please check if backend server is running on http://localhost:8000');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const filterCareers = () => {
-    let filtered = careers;
-
-    // Filter by category
-    if (selectedCategory !== 'all') {
-      filtered = filtered.filter(career => career.category === selectedCategory);
-    }
-
-    // Filter by search query
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(career =>
-        career.title.toLowerCase().includes(query) ||
-        career.description.toLowerCase().includes(query) ||
-        career.category.toLowerCase().includes(query) ||
-        career.required_skills.some(skill => skill.toLowerCase().includes(query))
+  // Filtering runs client-side: the whole catalogue is 24 rows, so a request
+  // per keystroke would add latency without adding accuracy.
+  const filtered = useMemo(() => {
+    if (!careers) return [];
+    const q = query.trim().toLowerCase();
+    return careers.filter((c) => {
+      if (activeCategory !== 'All' && c.category !== activeCategory) return false;
+      if (!q) return true;
+      return (
+        c.title.toLowerCase().includes(q) ||
+        c.description.toLowerCase().includes(q) ||
+        c.category.toLowerCase().includes(q) ||
+        (c.required_skills || []).some((s) => s.toLowerCase().includes(q))
       );
-    }
-
-    setFilteredCareers(filtered);
-  };
-
-  const getCategoryColor = (category) => {
-    const colors = {
-      'Software Development': 'bg-blue-100 text-blue-800',
-      'AI/ML': 'bg-purple-100 text-purple-800',
-      'Data': 'bg-green-100 text-green-800',
-      'Cloud/DevOps': 'bg-orange-100 text-orange-800',
-      'Cybersecurity': 'bg-red-100 text-red-800',
-      'Other': 'bg-indigo-100 text-indigo-800'
-    };
-    return colors[category] || 'bg-gray-100 text-gray-800';
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading careers...</p>
-        </div>
-      </div>
-    );
-  }
+    });
+  }, [careers, query, activeCategory]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 py-12">
-      <div className="container mx-auto px-4 max-w-7xl">
-        {/* Header */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">Explore Career Paths</h1>
-          <p className="text-xl text-gray-600">
-            Discover {careers.length} career opportunities in technology
-          </p>
-        </div>
+    <div className="space-y-7">
+      <div>
+        <h1 className="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
+          Browse careers
+        </h1>
+        <p className="mt-3 text-muted-foreground">
+          Every path in the database, with the skills each one expects.
+        </p>
+      </div>
 
-        {/* Search and Filter */}
-        <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search careers by name, skills, or category..."
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <Filter className="h-5 w-5 text-gray-400" />
-              <select
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                {categories.map(cat => (
-                  <option key={cat} value={cat}>
-                    {cat === 'all' ? 'All Categories' : cat}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* Results Count */}
-        <div className="mb-6">
-          <p className="text-gray-600">
-            Showing <span className="font-semibold text-gray-900">{filteredCareers.length}</span> career paths
-          </p>
-        </div>
-
-        {/* Careers Grid */}
-        {filteredCareers.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-xl shadow-lg">
-            <p className="text-gray-600 text-lg">No careers found matching your criteria.</p>
+      {/* --------------------------- filters --------------------------- */}
+      <div className="space-y-4">
+        <div className="relative">
+          <Search
+            className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground"
+            aria-hidden="true"
+          />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by title, skill or field"
+            aria-label="Search careers"
+            className={cx(inputClasses, 'pl-12 pr-12')}
+          />
+          {query && (
             <button
-              onClick={() => {
-                setSearchQuery('');
-                setSelectedCategory('all');
-              }}
-              className="mt-4 text-blue-600 hover:underline"
+              type="button"
+              onClick={() => setQuery('')}
+              aria-label="Clear search"
+              className="absolute right-2 top-1/2 grid h-10 w-10 -translate-y-1/2 cursor-pointer place-items-center rounded-lg text-muted-foreground transition-colors duration-200 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              Clear filters
+              <X className="h-4 w-4" aria-hidden="true" />
             </button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredCareers.map((career) => (
-              <div
-                key={career.id}
-                className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-all hover:scale-105"
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <h3 className="text-xl font-bold text-gray-900 mb-2">{career.title}</h3>
-                    <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${getCategoryColor(career.category)}`}>
-                      {career.category}
-                    </span>
-                  </div>
-                </div>
+          )}
+        </div>
 
-                <p className="text-gray-600 mb-4 line-clamp-2">{career.description}</p>
-
-                <div className="grid grid-cols-2 gap-3 mb-4">
-                  <div className="bg-green-50 p-3 rounded-lg">
-                    <DollarSign className="h-4 w-4 text-green-600 mb-1" />
-                    <p className="text-xs text-gray-600">Salary</p>
-                    <p className="text-sm font-semibold text-gray-900">
-                      ${(career.salary_range.min / 1000).toFixed(0)}k-${(career.salary_range.max / 1000).toFixed(0)}k
-                    </p>
-                  </div>
-                  <div className="bg-purple-50 p-3 rounded-lg">
-                    <TrendingUp className="h-4 w-4 text-purple-600 mb-1" />
-                    <p className="text-xs text-gray-600">Growth</p>
-                    <p className="text-sm font-semibold text-gray-900">{career.growth_potential}%</p>
-                  </div>
-                </div>
-
-                <div className="mb-4">
-                  <p className="text-sm text-gray-600 mb-2">Key Skills:</p>
-                  <div className="flex flex-wrap gap-1">
-                    {career.required_skills.slice(0, 3).map((skill, idx) => (
-                      <span
-                        key={idx}
-                        className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs"
-                      >
-                        {skill}
-                      </span>
-                    ))}
-                    {career.required_skills.length > 3 && (
-                      <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">
-                        +{career.required_skills.length - 3}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <Link
-                  to={`/careers/${career.id}`}
-                  className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all flex items-center justify-center gap-2"
+        {categories.length > 0 && (
+          <div
+            className="flex flex-wrap gap-2"
+            role="group"
+            aria-label="Filter by field"
+          >
+            {['All', ...categories].map((cat) => {
+              const active = activeCategory === cat;
+              return (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setActiveCategory(cat)}
+                  aria-pressed={active}
+                  className={cx(
+                    'min-h-[44px] cursor-pointer whitespace-nowrap rounded-xl border px-4 text-sm font-semibold',
+                    'transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                    active
+                      ? 'border-primary bg-primary text-on-primary'
+                      : 'border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground'
+                  )}
                 >
-                  View Details
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-              </div>
-            ))}
+                  {cat}
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
+
+      {/* ---------------------------- list ----------------------------- */}
+      {error ? (
+        <ErrorState message={error} onRetry={load} />
+      ) : careers === null ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }, (_, i) => (
+            <Skeleton key={i} className="h-56" />
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          title="No careers match that"
+          description={
+            query
+              ? `Nothing matched "${query}". Try a broader term, or clear the filters.`
+              : 'No careers in this field yet.'
+          }
+          action={
+            <Button
+              variant="outline"
+              onClick={() => {
+                setQuery('');
+                setActiveCategory('All');
+              }}
+            >
+              Clear filters
+            </Button>
+          }
+        />
+      ) : (
+        <>
+          <p className="text-sm text-muted-foreground" role="status">
+            Showing {filtered.length} of {careers.length} careers
+          </p>
+          <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {filtered.map((career) => (
+              <li key={career.id} className="animate-fade-in-up">
+                <Card className="flex h-full flex-col p-5">
+                  <Badge tone="primary" className="self-start">
+                    {career.category}
+                  </Badge>
+                  <h2 className="mt-3 text-lg font-bold text-foreground">
+                    {career.title}
+                  </h2>
+                  <p className="mt-2 flex-1 text-sm leading-relaxed text-muted-foreground">
+                    {career.description}
+                  </p>
+
+                  {career.required_skills?.length > 0 && (
+                    <ul className="mt-4 flex flex-wrap gap-1.5">
+                      {career.required_skills.slice(0, 4).map((s) => (
+                        <li key={s}>
+                          <Badge>{s}</Badge>
+                        </li>
+                      ))}
+                      {career.required_skills.length > 4 && (
+                        <li>
+                          <Badge>+{career.required_skills.length - 4}</Badge>
+                        </li>
+                      )}
+                    </ul>
+                  )}
+
+                  <div className="mt-5">
+                    <Button
+                      as={Link}
+                      to={`/careers/${career.id}`}
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                    >
+                      View roadmap
+                      <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                    </Button>
+                  </div>
+                </Card>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
     </div>
   );
-};
-
-export default CareerBrowser;
+}
