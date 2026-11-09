@@ -213,10 +213,14 @@ class RetryStats:
         self.retries = 0
         self.schema_rejections = 0
         self.failures = 0
+        self.last_error = None
         self.started = time.time()
 
     def record_attempt(self, error: str) -> None:
         self.retries += 1
+        # Keep the most recent failure so a deployed instance can be
+        # diagnosed from /health without shell access to the logs.
+        self.last_error = error[:300]
         if "SchemaValidationError" in error or "JSONDecodeError" in error:
             self.schema_rejections += 1
 
@@ -226,6 +230,7 @@ class RetryStats:
             "retries": self.retries,
             "schema_rejections": self.schema_rejections,
             "fallbacks_to_rule_based": self.failures,
+            "last_error": self.last_error,
             "uptime_seconds": round(time.time() - self.started, 1),
         }
 
