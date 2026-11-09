@@ -34,21 +34,27 @@ app = FastAPI(
 )
 
 # CORS middleware
+# Origins allowed out of the box: local dev plus the published Pages site.
+# ALLOWED_ORIGINS (comma-separated) *extends* this rather than replacing it,
+# so setting it in a hosting dashboard cannot accidentally lock out the
+# deployed frontend.
 DEFAULT_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:5173",
     "http://localhost:3001",
+    "https://jayahareeswarreddy.github.io",
 ]
-# Comma-separated list of production origins, set in the hosting dashboard.
-ALLOWED_ORIGINS = [
-    o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()
-] or DEFAULT_ORIGINS
+ALLOWED_ORIGINS = DEFAULT_ORIGINS + [
+    o.strip()
+    for o in os.getenv("ALLOWED_ORIGINS", "").split(",")
+    if o.strip() and o.strip() not in DEFAULT_ORIGINS
+]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    # Vercel gives every preview build its own subdomain.
-    allow_origin_regex=r"https://.*\.vercel\.app",
+    # Preview deployments get a generated subdomain per build.
+    allow_origin_regex=r"https://.*\.(vercel\.app|onrender\.com|github\.io)",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

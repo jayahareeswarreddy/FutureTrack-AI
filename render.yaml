@@ -1,0 +1,28 @@
+# Render blueprint. Create the service from this file, or configure the same
+# values by hand in the dashboard (see README).
+services:
+  - type: web
+    name: futuretrack-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    # Render injects $PORT; binding anything else makes the deploy time out.
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.7"
+      - key: PYTHONIOENCODING
+        value: utf-8
+      - key: AI_PROVIDER
+        value: groq
+      # Set in the dashboard, not here. Without it the API still works and
+      # falls back to rule-based explanations.
+      - key: GROQ_API_KEY
+        sync: false
+      # Optional. Omit entirely to run on the in-memory catalogue.
+      - key: MONGODB_URL
+        sync: false
+      - key: ALLOWED_ORIGINS
+        value: https://jayahareeswarreddy.github.io
