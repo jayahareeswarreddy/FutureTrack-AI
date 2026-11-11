@@ -41,12 +41,23 @@ PROVIDERS = {
         "env_key": "GROQ_API_KEY",
         "base_url": "https://api.groq.com/openai/v1",
         "default_model": "llama-3.3-70b-versatile",
+        # Tried in order when the default is unavailable. Groq retires model
+        # names periodically, which otherwise turns every call into a silent
+        # fallback to rule-based text.
+        "model_chain": [
+            "llama-3.3-70b-versatile",
+            "llama-3.1-8b-instant",
+            "openai/gpt-oss-120b",
+            "openai/gpt-oss-20b",
+            "qwen/qwen3-32b",
+        ],
     },
     "openai": {
         "label": "OpenAI",
         "env_key": "OPENAI_API_KEY",
         "base_url": None,  # SDK default
         "default_model": "gpt-4o-mini",
+        "model_chain": ["gpt-4o-mini", "gpt-4.1-mini", "gpt-3.5-turbo"],
     },
 }
 
@@ -83,7 +94,56 @@ def is_configured() -> bool:
 
 
 def model_name() -> str:
-    return os.getenv("AI_MODEL", "").strip() or provider_config()["default_model"]
+    return resolve_model()
+
+
+_resolved_model: Optional[str] = None
+
+
+def _list_remote_models() -> list:
+    """Model ids the provider currently serves. Empty list on any failure."""
+    from openai import OpenAI
+
+    cfg = provider_config()
+    kwargs = {"api_key": api_key(), "timeout": 10}
+    if cfg["base_url"]:
+        kwargs["base_url"] = cfg["base_url"]
+    try:
+        return [m.id for m in OpenAI(**kwargs).models.list().data]
+    except Exception as exc:
+        print(f"Could not list models from {cfg['label']}: {exc}")
+        return []
+
+
+def resolve_model() -> str:
+    """
+    Pick a model the provider actually serves.
+
+    An explicit AI_MODEL is honoured as-is. Otherwise the preference chain is
+    checked against the provider's live model list, so a retired default name
+    degrades to the next choice instead of failing every request.
+    """
+    global _resolved_model
+
+    explicit = os.getenv("AI_MODEL", "").strip()
+    if explicit:
+        return explicit
+    if _resolved_model:
+        return _resolved_model
+
+    cfg = provider_config()
+    available = set(_list_remote_models())
+    if available:
+        for candidate in cfg.get("model_chain", [cfg["default_model"]]):
+            if candidate in available:
+                _resolved_model = candidate
+                print(f"[ai] using {cfg['label']} model: {candidate}")
+                return candidate
+        print(f"[ai] none of the preferred models are served by {cfg['label']}; "
+              f"available: {sorted(available)[:8]}")
+
+    _resolved_model = cfg["default_model"]
+    return _resolved_model
 
 
 def describe_provider() -> dict:
