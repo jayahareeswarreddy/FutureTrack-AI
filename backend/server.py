@@ -147,8 +147,8 @@ CAREER_DATABASE = [
         "title": "Backend Developer",
         "category": "Software Development",
         "description": "Develop server-side logic, APIs, and database systems",
-        "required_skills": ["Python", "Node.js", "SQL", "REST APIs", "Database Design"],
-        "preferred_skills": ["Django", "Flask", "Express", "PostgreSQL", "MongoDB", "GraphQL"],
+        "required_skills": ["Python", "Node.js", "SQL", "REST APIs", "Database Design", "Java"],
+        "preferred_skills": ["Django", "Flask", "Express", "PostgreSQL", "MongoDB", "GraphQL", "C#", "Go", "Rust", "PHP", "Ruby", "Spring Boot"],
         "salary_range": {"min": 70000, "max": 130000, "currency": "USD"},
         "growth_potential": 88,
         "learning_path": [
@@ -166,7 +166,7 @@ CAREER_DATABASE = [
         "category": "Software Development",
         "description": "Work on both frontend and backend development",
         "required_skills": ["JavaScript", "React", "Node.js", "SQL", "REST APIs"],
-        "preferred_skills": ["TypeScript", "Next.js", "MongoDB", "Docker", "AWS"],
+        "preferred_skills": ["TypeScript", "Next.js", "MongoDB", "Docker", "AWS", "Java", "PHP", "Ruby"],
         "salary_range": {"min": 75000, "max": 140000, "currency": "USD"},
         "growth_potential": 92,
         "learning_path": [
@@ -184,7 +184,7 @@ CAREER_DATABASE = [
         "category": "Software Development",
         "description": "Develop native or cross-platform mobile applications",
         "required_skills": ["React Native", "Swift", "Kotlin", "Mobile UI/UX"],
-        "preferred_skills": ["Flutter", "iOS Development", "Android Development", "Firebase"],
+        "preferred_skills": ["Flutter", "iOS Development", "Android Development", "Firebase", "Java", "C#"],
         "salary_range": {"min": 70000, "max": 130000, "currency": "USD"},
         "growth_potential": 85,
         "learning_path": [
@@ -203,7 +203,7 @@ CAREER_DATABASE = [
         "category": "AI/ML",
         "description": "Analyze data and build ML models to solve business problems",
         "required_skills": ["Python", "SQL", "Machine Learning", "Statistics", "Data Analysis"],
-        "preferred_skills": ["TensorFlow", "PyTorch", "Pandas", "NumPy", "Tableau", "AWS"],
+        "preferred_skills": ["TensorFlow", "PyTorch", "Pandas", "NumPy", "Tableau", "AWS", "R"],
         "salary_range": {"min": 80000, "max": 150000, "currency": "USD"},
         "growth_potential": 95,
         "learning_path": [
@@ -239,7 +239,7 @@ CAREER_DATABASE = [
         "category": "AI/ML",
         "description": "Develop natural language processing systems and applications",
         "required_skills": ["Python", "NLP", "Transformers", "Deep Learning", "Text Processing"],
-        "preferred_skills": ["BERT", "GPT", "Hugging Face", "spaCy", "NLTK"],
+        "preferred_skills": ["BERT", "GPT", "Hugging Face", "spaCy", "NLTK", "R"],
         "salary_range": {"min": 95000, "max": 170000, "currency": "USD"},
         "growth_potential": 96,
         "learning_path": [
@@ -257,7 +257,7 @@ CAREER_DATABASE = [
         "category": "AI/ML",
         "description": "Develop computer vision and image processing systems",
         "required_skills": ["Python", "OpenCV", "Deep Learning", "Image Processing", "CNN"],
-        "preferred_skills": ["TensorFlow", "PyTorch", "YOLO", "Image Classification"],
+        "preferred_skills": ["TensorFlow", "PyTorch", "YOLO", "Image Classification", "C++"],
         "salary_range": {"min": 95000, "max": 170000, "currency": "USD"},
         "growth_potential": 94,
         "learning_path": [
@@ -275,7 +275,7 @@ CAREER_DATABASE = [
         "category": "AI/ML",
         "description": "Conduct research in artificial intelligence and machine learning",
         "required_skills": ["Python", "Research", "Mathematics", "Deep Learning", "Publications"],
-        "preferred_skills": ["PyTorch", "TensorFlow", "Research Papers", "PhD"],
+        "preferred_skills": ["PyTorch", "TensorFlow", "Research Papers", "PhD", "C++", "Julia"],
         "salary_range": {"min": 120000, "max": 200000, "currency": "USD"},
         "growth_potential": 99,
         "learning_path": [
@@ -293,7 +293,7 @@ CAREER_DATABASE = [
         "category": "AI/ML",
         "description": "Specialize in deep learning architectures and neural networks",
         "required_skills": ["Python", "Deep Learning", "Neural Networks", "TensorFlow", "PyTorch"],
-        "preferred_skills": ["CNN", "RNN", "GAN", "Transfer Learning", "GPU Computing"],
+        "preferred_skills": ["CNN", "RNN", "GAN", "Transfer Learning", "GPU Computing", "C++", "CUDA"],
         "salary_range": {"min": 105000, "max": 185000, "currency": "USD"},
         "growth_potential": 97,
         "learning_path": [
@@ -311,7 +311,7 @@ CAREER_DATABASE = [
         "category": "AI/ML",
         "description": "Operationalize machine learning models and pipelines",
         "required_skills": ["Python", "MLOps", "Docker", "Kubernetes", "CI/CD"],
-        "preferred_skills": ["MLflow", "Kubeflow", "Airflow", "AWS SageMaker", "Monitoring"],
+        "preferred_skills": ["MLflow", "Kubeflow", "Airflow", "AWS SageMaker", "Monitoring", "Go", "Bash"],
         "salary_range": {"min": 110000, "max": 180000, "currency": "USD"},
         "growth_potential": 95,
         "learning_path": [
@@ -348,7 +348,7 @@ CAREER_DATABASE = [
         "category": "Data",
         "description": "Design and build data pipelines and infrastructure",
         "required_skills": ["Python", "SQL", "ETL", "Big Data", "Data Pipelines"],
-        "preferred_skills": ["Apache Spark", "Airflow", "Kafka", "AWS", "Hadoop"],
+        "preferred_skills": ["Apache Spark", "Airflow", "Kafka", "AWS", "Hadoop", "Java", "Scala"],
         "salary_range": {"min": 85000, "max": 140000, "currency": "USD"},
         "growth_potential": 90,
         "learning_path": [
@@ -366,7 +366,7 @@ CAREER_DATABASE = [
         "category": "Data",
         "description": "Create BI solutions and dashboards for business insights",
         "required_skills": ["SQL", "BI Tools", "Data Warehousing", "ETL", "Analytics"],
-        "preferred_skills": ["Tableau", "Power BI", "Qlik", "SSAS", "Data Modeling"],
+        "preferred_skills": ["Tableau", "Power BI", "Qlik", "SSAS", "Data Modeling", "R"],
         "salary_range": {"min": 70000, "max": 120000, "currency": "USD"},
         "growth_potential": 87,
         "learning_path": [
@@ -385,7 +385,7 @@ CAREER_DATABASE = [
         "category": "Cloud/DevOps",
         "description": "Automate infrastructure and deployment processes",
         "required_skills": ["Linux", "Docker", "Kubernetes", "CI/CD", "AWS"],
-        "preferred_skills": ["Terraform", "Ansible", "Jenkins", "GitLab CI", "Monitoring"],
+        "preferred_skills": ["Terraform", "Ansible", "Jenkins", "GitLab CI", "Monitoring", "Go", "Bash", "PowerShell"],
         "salary_range": {"min": 85000, "max": 140000, "currency": "USD"},
         "growth_potential": 92,
         "learning_path": [
@@ -403,7 +403,7 @@ CAREER_DATABASE = [
         "category": "Cloud/DevOps",
         "description": "Design and implement cloud infrastructure solutions",
         "required_skills": ["AWS", "Azure", "GCP", "Architecture", "Cloud Security"],
-        "preferred_skills": ["Terraform", "CloudFormation", "Kubernetes", "Serverless"],
+        "preferred_skills": ["Terraform", "CloudFormation", "Kubernetes", "Serverless", "Go", "Java", "Bash"],
         "salary_range": {"min": 100000, "max": 160000, "currency": "USD"},
         "growth_potential": 93,
         "learning_path": [
@@ -421,7 +421,7 @@ CAREER_DATABASE = [
         "category": "Cloud/DevOps",
         "description": "Ensure system reliability and performance",
         "required_skills": ["Linux", "Monitoring", "Incident Response", "Automation", "SRE"],
-        "preferred_skills": ["Prometheus", "Grafana", "Kubernetes", "Python", "Go"],
+        "preferred_skills": ["Prometheus", "Grafana", "Kubernetes", "Python", "Go", "Bash", "Rust"],
         "salary_range": {"min": 95000, "max": 150000, "currency": "USD"},
         "growth_potential": 91,
         "learning_path": [
@@ -440,7 +440,7 @@ CAREER_DATABASE = [
         "category": "Cybersecurity",
         "description": "Protect systems and networks from security threats",
         "required_skills": ["Cybersecurity", "Network Security", "Security Tools", "Risk Assessment"],
-        "preferred_skills": ["Penetration Testing", "SIEM", "Firewalls", "Encryption", "Compliance"],
+        "preferred_skills": ["Penetration Testing", "SIEM", "Firewalls", "Encryption", "Compliance", "C", "Go", "Bash"],
         "salary_range": {"min": 80000, "max": 140000, "currency": "USD"},
         "growth_potential": 94,
         "learning_path": [
@@ -458,7 +458,7 @@ CAREER_DATABASE = [
         "category": "Cybersecurity",
         "description": "Test systems for security vulnerabilities",
         "required_skills": ["Penetration Testing", "Ethical Hacking", "Security Tools", "Vulnerability Assessment"],
-        "preferred_skills": ["Kali Linux", "Metasploit", "OWASP", "Certifications", "Reporting"],
+        "preferred_skills": ["Kali Linux", "Metasploit", "OWASP", "Certifications", "Reporting", "C", "Ruby", "Bash"],
         "salary_range": {"min": 75000, "max": 130000, "currency": "USD"},
         "growth_potential": 89,
         "learning_path": [
@@ -513,7 +513,7 @@ CAREER_DATABASE = [
         "category": "Other",
         "description": "Test software for quality and bugs",
         "required_skills": ["Testing", "Test Automation", "QA", "Bug Tracking", "Test Planning"],
-        "preferred_skills": ["Selenium", "Cypress", "Jest", "API Testing", "Performance Testing"],
+        "preferred_skills": ["Selenium", "Cypress", "Jest", "API Testing", "Performance Testing", "Java", "TypeScript"],
         "salary_range": {"min": 60000, "max": 110000, "currency": "USD"},
         "growth_potential": 86,
         "learning_path": [
@@ -531,7 +531,7 @@ CAREER_DATABASE = [
         "category": "Other",
         "description": "Develop blockchain and cryptocurrency applications",
         "required_skills": ["Blockchain", "Solidity", "Smart Contracts", "Web3", "Cryptography"],
-        "preferred_skills": ["Ethereum", "DeFi", "NFT", "Truffle", "Hardhat"],
+        "preferred_skills": ["Ethereum", "DeFi", "NFT", "Truffle", "Hardhat", "Rust", "Go"],
         "salary_range": {"min": 90000, "max": 160000, "currency": "USD"},
         "growth_potential": 93,
         "learning_path": [
@@ -548,8 +548,8 @@ CAREER_DATABASE = [
         "title": "Game Developer",
         "category": "Other",
         "description": "Develop video games and interactive experiences",
-        "required_skills": ["Game Development", "Unity", "C#", "Game Design", "3D Graphics"],
-        "preferred_skills": ["Unreal Engine", "Game Physics", "Animation", "Multiplayer", "VR/AR"],
+        "required_skills": ["Game Development", "Unity", "C#", "Game Design", "3D Graphics", "C++"],
+        "preferred_skills": ["Unreal Engine", "Game Physics", "Animation", "Multiplayer", "VR/AR", "C#", "Lua", "Rust"],
         "salary_range": {"min": 65000, "max": 120000, "currency": "USD"},
         "growth_potential": 87,
         "learning_path": [

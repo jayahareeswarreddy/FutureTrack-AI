@@ -272,3 +272,27 @@ def test_unknown_skill_still_returns_something():
 
 def test_empty_skill_is_rejected():
     assert client.get("/resources", params={"skill": "  "}).status_code == 422
+
+
+def test_mainstream_languages_are_selectable():
+    """
+    /skills drives the autocomplete and is derived from the career catalogue,
+    so a language no career lists is invisible to users and can never affect
+    a match score. Java and C++ were both in that state.
+    """
+    names = {s["skill"] for s in client.get("/skills", params={"limit": 500}).json()["skills"]}
+    for lang in ["Java", "C++", "C#", "Go", "Rust", "Ruby", "PHP", "R", "Scala"]:
+        assert lang in names, f"{lang} missing from the skill catalogue"
+
+
+def test_every_career_skill_has_curated_resources():
+    """No skill offered in the UI may fall through to a generic web search."""
+    import resources
+
+    uncovered = []
+    for career in client.get("/careers").json():
+        for skill in career.get("required_skills", []) + career.get("preferred_skills", []):
+            items = resources.get_resources_for_skill(skill)
+            if any(i["provider"] == "Web search" for i in items):
+                uncovered.append(skill)
+    assert not uncovered, f"no curated resources for: {sorted(set(uncovered))}"

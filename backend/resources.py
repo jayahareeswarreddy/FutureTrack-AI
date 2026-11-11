@@ -842,3 +842,25 @@ CATALOGUE.update({
         {"kind": "docs", "title": "SQL Server Analysis Services docs", "url": "https://learn.microsoft.com/en-us/analysis-services/", "provider": "Microsoft"},
     ],
 })
+
+
+# Languages and toolkits pulled in when careers gained mainstream languages.
+CATALOGUE.update({
+    "spring boot": [
+        {"kind": "docs", "title": "Spring Boot reference documentation", "url": "https://docs.spring.io/spring-boot/index.html", "provider": "VMware"},
+        {"kind": "course", "title": "Spring Boot guides", "url": "https://spring.io/guides", "provider": "spring.io"},
+        _youtube("Spring Boot tutorial"),
+    ],
+    "cuda": [
+        {"kind": "docs", "title": "CUDA C++ Programming Guide", "url": "https://docs.nvidia.com/cuda/cuda-c-programming-guide/", "provider": "NVIDIA"},
+        {"kind": "course", "title": "CUDA training & tutorials", "url": "https://developer.nvidia.com/cuda-education", "provider": "NVIDIA"},
+    ],
+    "julia": [
+        {"kind": "docs", "title": "The Julia Manual", "url": "https://docs.julialang.org/en/v1/", "provider": "julialang.org"},
+        {"kind": "course", "title": "Julia Academy (free)", "url": "https://juliaacademy.com/", "provider": "Julia Computing"},
+    ],
+    "lua": [
+        {"kind": "book", "title": "Programming in Lua (first edition, free)", "url": "https://www.lua.org/pil/contents.html", "provider": "lua.org"},
+        {"kind": "docs", "title": "Lua 5.4 Reference Manual", "url": "https://www.lua.org/manual/5.4/", "provider": "lua.org"},
+    ],
+})
