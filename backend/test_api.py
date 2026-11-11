@@ -365,3 +365,8 @@ def test_fallback_reports_a_real_score_not_a_flat_half():
     recs = r.json()["recommendations"]
     assert recs
     assert not all(x["match_score"] == 0.5 for x in recs)
+
+
+def test_head_root_is_not_405():
+    """Platform probes and uptime monitors default to HEAD."""
+    assert client.head("/").status_code == 200

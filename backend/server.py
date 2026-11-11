@@ -563,6 +563,9 @@ CAREER_DATABASE = [
     }
 ]
 
+# HEAD as well as GET: platform probes and uptime monitors default to HEAD,
+# and a GET-only route answers those with 405.
+@app.head("/", include_in_schema=False)
 @app.get("/")
 async def root():
     return {
