@@ -222,3 +222,53 @@ async def test_generate_validated_raises_without_key():
 @pytest.fixture
 def anyio_backend():
     return "asyncio"
+
+
+# ------------------------------------------------------ learning resources
+
+def test_resources_cover_every_career():
+    """No career may render an empty resources panel."""
+    for career in client.get("/careers").json():
+        body = client.get(f"/careers/{career['id']}/resources").json()
+        assert body["total_resources"] > 0, career["id"]
+
+
+@pytest.mark.parametrize(
+    "skill", ["Python", "Java", "C++", "R", "SQL", "Solidity", "spaCy", "Kafka"]
+)
+def test_named_skills_have_curated_resources(skill):
+    r = client.get("/resources", params={"skill": skill})
+    assert r.status_code == 200
+    items = r.json()["resources"]
+    assert items
+    # A curated hit, not the generated web-search fallback.
+    assert not any(i["provider"] == "Web search" for i in items)
+
+
+@pytest.mark.parametrize(
+    "skill,expected_in_title",
+    [
+        ("Ruby on Rails", "Ruby"),
+        ("Java Spring", "Java"),
+        ("React Native Navigation", "React Native"),
+    ],
+)
+def test_multiword_skills_match_the_longest_key(skill, expected_in_title):
+    """
+    A naive substring scan lets a one-letter key like "r" hijack
+    "Ruby on Rails". Matching must prefer the longest whole-token key.
+    """
+    items = client.get("/resources", params={"skill": skill}).json()["resources"]
+    joined = " ".join(i["title"] for i in items)
+    assert expected_in_title.lower() in joined.lower()
+
+
+def test_unknown_skill_still_returns_something():
+    items = client.get("/resources", params={"skill": "Quantum Basketweaving"}).json()[
+        "resources"
+    ]
+    assert len(items) >= 1
+
+
+def test_empty_skill_is_rejected():
+    assert client.get("/resources", params={"skill": "  "}).status_code == 422

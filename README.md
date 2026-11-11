@@ -91,8 +91,11 @@ Search escapes its input before it reaches MongoDB's `$regex`, so queries like
 
 ## Learning resources
 
-`backend/resources.py` is a hand-curated catalogue keyed by skill. Editorial
-rules it follows:
+`backend/resources.py` is a hand-curated catalogue: 295 resources across 188
+skills, covering languages (Python, Java, C++, C, R, Go, Rust, Ruby, PHP,
+Scala, Kotlin, Swift, Dart), frameworks, data and ML, cloud and DevOps,
+security, testing, design, game development and web3. Editorial rules it
+follows:
 
 - Documentation, books and courses are exact URLs to canonical homes — official
   docs, or books the author publishes free online.
@@ -102,6 +105,9 @@ rules it follows:
 - Everything listed is free to access without an account.
 - Unknown skills fall back to a generated search bundle, so the panel is never
   empty.
+- Lookup matches the **longest whole-token key**, not any substring. A naive
+  scan lets the one-letter key `r` hijack "Ruby on Rails", and `c` hijack
+  almost everything.
 
 ## Running it
 
@@ -136,7 +142,7 @@ pip install pytest anyio httpx
 pytest test_api.py -q
 ```
 
-29 tests, run with no MongoDB and no API key — deliberately, because that is
+43 tests, run with no MongoDB and no API key — deliberately, because that is
 the configuration where the fallbacks have to hold.
 
 ## Stack
