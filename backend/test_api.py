@@ -296,3 +296,72 @@ def test_every_career_skill_has_curated_resources():
             if any(i["provider"] == "Web search" for i in items):
                 uncovered.append(skill)
     assert not uncovered, f"no curated resources for: {sorted(set(uncovered))}"
+
+
+# ------------------------------------------------------- match scoring
+
+def test_ai_interest_returns_ai_careers():
+    """
+    Interests were compared to the category by substring, so "Artificial
+    intelligence" never matched "AI/ML" and the request fell through to an
+    arbitrary-careers fallback that returned Frontend Developer at 50%.
+    """
+    r = client.post(
+        "/recommendations",
+        json={
+            "skills": ["Python"],
+            "interests": ["Artificial intelligence"],
+            "experience_years": 2,
+        },
+    )
+    assert r.status_code == 200
+    titles = [x["career"] for x in r.json()["recommendations"]]
+    ai_titles = {
+        c["title"] for c in client.get("/careers").json() if c["category"] == "AI/ML"
+    }
+    assert any(t in ai_titles for t in titles), titles
+    assert "Frontend Developer" not in titles
+
+
+@pytest.mark.parametrize(
+    "skill,career_id,must_not_match",
+    [
+        ("R", "frontend-developer", ["React", "REST APIs", "Responsive Design"]),
+        ("Go", "backend-developer", ["Django", "MongoDB", "GraphQL"]),
+        ("C", "frontend-developer", ["CSS"]),
+    ],
+)
+def test_short_skills_do_not_substring_match(skill, career_id, must_not_match):
+    """A one- or two-letter skill must not match by being a substring."""
+    from server import _count_matches, _skill_set
+
+    career = next(
+        c for c in client.get("/careers").json() if c["id"] == career_id
+    )
+    user = _skill_set([skill])
+    spurious = [s for s in must_not_match if _count_matches(user, [s])]
+    assert not spurious, f"{skill} wrongly matched {spurious}"
+
+
+def test_interest_match_lifts_the_right_category():
+    from server import UserProfile, calculate_match_score
+
+    careers = {c["id"]: c for c in client.get("/careers").json()}
+    profile = UserProfile(
+        skills=["Python"], interests=["Cybersecurity"], experience_years=1
+    )
+    sec = calculate_match_score(profile, careers["security-engineer"])
+    ui = calculate_match_score(profile, careers["ui-ux-designer"])
+    assert sec > ui
+
+
+def test_fallback_reports_a_real_score_not_a_flat_half():
+    """The old fallback hardcoded 0.5 for arbitrary careers."""
+    r = client.post(
+        "/recommendations",
+        json={"skills": ["Underwater Basketweaving"], "experience_years": 0},
+    )
+    assert r.status_code == 200
+    recs = r.json()["recommendations"]
+    assert recs
+    assert not all(x["match_score"] == 0.5 for x in recs)

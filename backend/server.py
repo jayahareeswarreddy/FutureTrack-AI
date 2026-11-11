@@ -736,20 +736,37 @@ async def get_recommendations(profile: UserProfile):
         # Get top 3 recommendations (or all if less than 3)
         top_recommendations = recommendations[:3] if len(recommendations) >= 3 else recommendations
         
-        # If no recommendations, return top careers anyway
+        # Nothing cleared the relevance threshold. Returning the first three
+        # careers in database order at a hardcoded 0.5 was actively
+        # misleading: it ignored the declared interest and presented an
+        # arbitrary result as a 50% match. Rank everything by its real score
+        # instead, preferring the categories the user said they care about,
+        # and report the score that was actually computed.
         if not top_recommendations:
+            scored = sorted(
+                (
+                    (
+                        calculate_match_score(profile, c),
+                        _interest_matches(profile.interests, c.get("category", "")),
+                        c,
+                    )
+                    for c in all_careers
+                ),
+                key=lambda t: (t[1], t[0]),
+                reverse=True,
+            )
             top_recommendations = [
                 {
-                    "career": career["title"],
-                    "career_id": career["id"],
-                    "match_score": 0.5,
-                    "reasoning": f"This is a popular career path in {career['category']} that you might be interested in.",
-                    "required_skills": career.get("required_skills", []),
-                    "learning_path": career.get("learning_path", []),
-                    "salary_range": career.get("salary_range", {}),
-                    "growth_potential": career.get("growth_potential", 0)
+                    "career": c["title"],
+                    "career_id": c["id"],
+                    "match_score": round(s, 3),
+                    "reasoning": generate_rule_based_reasoning(profile, c, s),
+                    "required_skills": c.get("required_skills", []),
+                    "learning_path": c.get("learning_path", []),
+                    "salary_range": c.get("salary_range", {}),
+                    "growth_potential": c.get("growth_potential", 0),
                 }
-                for career in all_careers[:3]
+                for s, _, c in scored[:3]
             ]
         
         # Generate user profile summary
@@ -829,49 +846,123 @@ def generate_rule_based_reasoning(profile: UserProfile, career: dict, score: flo
     
     return ". ".join(reasons) + f" Match score: {score:.0%}"
 
+# Interests offered by the UI, mapped to the career categories they imply.
+# Matching an interest string against a category by substring does not work:
+# "Artificial intelligence" and "AI/ML" share no substring, so the single most
+# common interest silently matched nothing.
+INTEREST_CATEGORIES = {
+    "artificial intelligence": {"AI/ML"},
+    "machine learning": {"AI/ML"},
+    "research": {"AI/ML"},
+    "data analysis": {"Data", "AI/ML"},
+    "web development": {"Software Development"},
+    "mobile apps": {"Software Development"},
+    "game development": {"Other", "Software Development"},
+    "cloud infrastructure": {"Cloud/DevOps"},
+    "automation": {"Cloud/DevOps", "Other"},
+    "cybersecurity": {"Cybersecurity"},
+    "product design": {"Other"},
+}
+
+# Common ways people write a skill that the catalogue spells differently.
+SKILL_ALIASES = {
+    "js": "javascript",
+    "ts": "typescript",
+    "golang": "go",
+    "py": "python",
+    "c++": "c++",
+    "cpp": "c++",
+    "csharp": "c#",
+    "dotnet": "c#",
+    "node": "node.js",
+    "nodejs": "node.js",
+    "reactjs": "react",
+    "react.js": "react",
+    "postgres": "postgresql",
+    "k8s": "kubernetes",
+    "ml": "machine learning",
+    "ai": "machine learning",
+    "dl": "deep learning",
+    "nlp": "nlp",
+    "cv": "computer vision",
+    "restapi": "rest apis",
+    "rest api": "rest apis",
+    "tf": "tensorflow",
+    "sklearn": "scikit-learn",
+}
+
+
+def _canonical_skill(skill: str) -> str:
+    """Lowercase, trimmed, alias-resolved form used for comparison."""
+    key = " ".join(skill.lower().split())
+    return SKILL_ALIASES.get(key, key)
+
+
+def _skill_set(skills) -> set:
+    return {_canonical_skill(s) for s in skills if s and s.strip()}
+
+
+def _count_matches(user_skills: set, career_skills: list) -> int:
+    """
+    How many of a career's skills the user has.
+
+    Exact comparison on the canonical form, never substring. A substring test
+    makes "Go" match Django and MongoDB, and "R" match React, REST APIs and
+    Responsive Design, which inflates every score into noise.
+    """
+    return sum(1 for s in career_skills if _canonical_skill(s) in user_skills)
+
+
+def _interest_matches(interests, category: str) -> bool:
+    for interest in interests:
+        key = " ".join(interest.lower().split())
+        if category in INTEREST_CATEGORIES.get(key, set()):
+            return True
+        # Unknown interest: fall back to a case-insensitive category compare,
+        # which still catches "Cybersecurity" and other exact names.
+        if key and key == category.lower():
+            return True
+    return False
+
+
 def calculate_match_score(profile: UserProfile, career: dict) -> float:
-    """Calculate match score between user profile and career"""
+    """
+    Weighted match between a profile and a career, in [0, 1].
+
+    Required skills dominate, preferred skills and declared interest adjust,
+    and experience contributes a little. Deterministic: no model involved.
+    """
     score = 0.0
     max_score = 0.0
-    
-    user_skills_lower = [s.lower() for s in profile.skills]
+
+    user_skills = _skill_set(profile.skills)
     required_skills = career.get("required_skills", [])
     preferred_skills = career.get("preferred_skills", [])
-    
-    # Required skills matching (50% weight)
+
+    # Required skills (50%)
     if required_skills:
-        matching_required = sum(1 for skill in required_skills 
-                               if any(us in skill.lower() or skill.lower() in us 
-                                     for us in user_skills_lower))
-        skill_match = matching_required / len(required_skills)
-        score += skill_match * 0.5
+        matched = _count_matches(user_skills, required_skills)
+        score += (matched / len(required_skills)) * 0.5
         max_score += 0.5
-    
-    # Preferred skills matching (20% weight)
+
+    # Preferred skills (20%)
     if preferred_skills:
-        matching_preferred = sum(1 for skill in preferred_skills 
-                                if any(us in skill.lower() or skill.lower() in us 
-                                      for us in user_skills_lower))
-        preferred_match = matching_preferred / len(preferred_skills)
-        score += preferred_match * 0.2
+        matched = _count_matches(user_skills, preferred_skills)
+        score += (matched / len(preferred_skills)) * 0.2
         max_score += 0.2
-    
-    # Experience level (15% weight)
-    exp_score = min(profile.experience_years / 5, 1.0)
-    score += exp_score * 0.15
+
+    # Experience (15%)
+    score += min(profile.experience_years / 5, 1.0) * 0.15
     max_score += 0.15
-    
-    # Interest matching (15% weight)
+
+    # Declared interest (15%)
     if profile.interests:
-        category_lower = career["category"].lower()
-        interest_match = any(interest.lower() in category_lower or 
-                            category_lower in interest.lower() 
-                            for interest in profile.interests)
-        if interest_match:
+        if _interest_matches(profile.interests, career.get("category", "")):
             score += 0.15
         max_score += 0.15
-    
+
     return min(score / max_score if max_score > 0 else 0, 1.0)
+
 
 @app.get("/careers/{career_id}/roadmap")
 async def get_learning_roadmap(career_id: str):
