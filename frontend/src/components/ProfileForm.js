@@ -238,12 +238,15 @@ export default function ProfileForm() {
 
   return (
     <div className="mx-auto max-w-2xl">
-      <h1 className="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
-        Tell us what you know
-      </h1>
-      <p className="mt-3 text-muted-foreground">
-        Only your skills are required. The more you add, the sharper the match.
-      </p>
+      <div className="head-beam">
+        <div className="eyebrow">Your profile</div>
+        <h1 className="mt-3 text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
+          Tell us what you know
+        </h1>
+        <p className="mt-3 text-muted-foreground">
+          Only your skills are required. The more you add, the sharper the match.
+        </p>
+      </div>
 
       {submitError && (
         <div className="mt-6">

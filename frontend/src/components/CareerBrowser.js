@@ -53,9 +53,11 @@ export default function CareerBrowser() {
   return (
     <div className="space-y-7">
       <div>
-        <h1 className="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
+        <div className="eyebrow">The database</div>
+        <h1 className="mt-3 text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
           Browse careers
         </h1>
+        <div className="rule-bar" aria-hidden="true" />
         <p className="mt-3 text-muted-foreground">
           Every path in the database, with the skills each one expects.
         </p>

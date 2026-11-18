@@ -107,10 +107,16 @@ export default function CareerResources({ careerId }) {
 
   return (
     <>
-      <p className="mt-3 text-muted-foreground">
-        {data.total_resources} free resources — official documentation, books
-        and video courses, grouped by the skill they teach.
-      </p>
+      <div className="head-dots">
+        <div className="eyebrow">Keep learning</div>
+        <h1 className="mt-3 text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
+          Learning resources
+        </h1>
+        <p className="mt-3 text-muted-foreground">
+          {data.total_resources} free resources — official documentation, books
+          and video courses, grouped by the skill they teach.
+        </p>
+      </div>
       <div className="mt-5 grid gap-4 sm:grid-cols-2">
         {data.by_skill.map((group) => (
           <Card key={group.skill} className="p-5">
