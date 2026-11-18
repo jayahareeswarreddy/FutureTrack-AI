@@ -41,21 +41,21 @@
   }
 
   .dark {
-    --color-primary: #60a5fa;
-    --color-primary-hover: #93c5fd;
-    --color-on-primary: #0b1220;
-    --color-secondary: #3b82f6;
-    --color-accent: #fb923c;
-    --color-accent-hover: #fdba74;
-    --color-on-accent: #1a0d02;
+    --color-primary: #2ea6e4;
+    --color-primary-hover: #52b7ec;
+    --color-on-primary: #06121d;
+    --color-secondary: #38bdf8;
+    --color-accent: #6fa8f0;
+    --color-accent-hover: #93c0f5;
+    --color-on-accent: #081120;
 
-    --color-background: #0d1a33;
-    --color-foreground: #e8eefb;
-    --color-card: #131c2e;
-    --color-card-foreground: #e8eefb;
-    --color-muted: #1c2638;
-    --color-muted-foreground: #a9b7cf;
-    --color-border: #26334a;
+    --color-background: #0e1836;
+    --color-foreground: #eef2fb;
+    --color-card: #15203f;
+    --color-card-foreground: #eef2fb;
+    --color-muted: #1b2748;
+    --color-muted-foreground: #aab8d6;
+    --color-border: #28345a;
 
     --color-success: #4ade80;
     --color-warning: #fbbf24;
@@ -126,12 +126,12 @@
     background:
       radial-gradient(
         60rem 40rem at 15% -10%,
-        rgba(37, 99, 235, 0.16),
+        rgba(46, 166, 228, 0.16),
         transparent 60%
       ),
       radial-gradient(
         50rem 35rem at 95% 10%,
-        rgba(234, 88, 12, 0.1),
+        rgba(111, 168, 240, 0.1),
         transparent 55%
       );
   }
