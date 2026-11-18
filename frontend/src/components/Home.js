@@ -53,16 +53,21 @@ export default function Home() {
   return (
     <div className="space-y-section">
       {/* ------------------------------ hero ------------------------------ */}
-      <section className="animate-fade-in-up">
-        <Badge tone="accent">AI career guidance</Badge>
-        <h1 className="mt-5 max-w-3xl text-4xl font-extrabold leading-[1.1] tracking-tight text-foreground sm:text-5xl lg:text-6xl">
+      <section className="hero animate-fade-in-up">
+        <div className="flex items-center gap-3 text-primary">
+          <span className="h-px w-8 bg-primary/70" aria-hidden="true" />
+          <span className="text-xs font-semibold uppercase tracking-[0.22em]">
+            AI career guidance
+          </span>
+        </div>
+        <h1 className="mt-6 max-w-4xl text-5xl font-extrabold leading-[1.03] tracking-tight text-foreground sm:text-6xl lg:text-7xl">
           Find the tech career your skills already point to.
         </h1>
-        <p className="mt-5 max-w-2xl text-lg text-muted-foreground">
+        <p className="mt-6 max-w-2xl text-lg leading-relaxed text-muted-foreground sm:text-xl">
           Describe what you know and what you enjoy. FutureTrack scores you
           against{' '}
           {careerCount ? (
-            <strong className="font-bold text-foreground">
+            <strong className="font-semibold text-primary">
               {careerCount} career paths
             </strong>
           ) : (
@@ -71,7 +76,7 @@ export default function Home() {
           , explains each match, and hands you the roadmap to get there.
         </p>
 
-        <div className="mt-8 flex flex-wrap gap-3">
+        <div className="mt-9 flex flex-wrap gap-3">
           <Button as={Link} to="/profile" variant="accent" size="lg">
             Get my recommendations
             <ArrowRight className="h-5 w-5" aria-hidden="true" />

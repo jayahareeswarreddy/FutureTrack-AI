@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -103,6 +103,9 @@
   h1,
   h2,
   h3 {
+    /* Bold display type (task.win-style), tightened tracking. */
+    font-family: 'Space Grotesk', 'Plus Jakarta Sans', sans-serif;
+    letter-spacing: -0.02em;
     /* Keeps short headings from leaving a one-word orphan line. */
     text-wrap: balance;
   }
@@ -134,6 +137,42 @@
         rgba(111, 168, 240, 0.1),
         transparent 55%
       );
+  }
+
+  /* task.win-style hero: faint grid + a cyan glow behind the headline. */
+  .hero {
+    position: relative;
+    overflow: hidden;
+    border-radius: 1.5rem;
+    padding: clamp(2.5rem, 6vw, 5rem) clamp(1.25rem, 4vw, 3rem);
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+    background-size: 44px 44px;
+    -webkit-mask-image: radial-gradient(75% 75% at 50% 0%, #000 45%, transparent 100%);
+    mask-image: radial-gradient(75% 75% at 50% 0%, #000 45%, transparent 100%);
+  }
+  .hero::after {
+    content: '';
+    position: absolute;
+    z-index: 0;
+    top: -35%;
+    left: 50%;
+    width: 60rem;
+    height: 42rem;
+    transform: translateX(-50%);
+    background: radial-gradient(closest-side, rgba(46, 166, 228, 0.22), transparent 72%);
+    pointer-events: none;
+  }
+  .hero > * {
+    position: relative;
+    z-index: 1;
   }
 
   .focus-ring {
