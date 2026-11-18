@@ -1,41 +1,15 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
-import { Compass, Sun, Moon, Menu, X, Cpu, Database } from 'lucide-react';
+import { Compass, Menu, X, Cpu, Database } from 'lucide-react';
 import { getHealth } from '../lib/api';
 import { cx, Badge } from './ui';
 
-/* --------------------------- theme handling --------------------------- */
-
-const STORAGE_KEY = 'futuretrack-theme';
-
-function readInitialTheme() {
-  try {
-    const saved = window.localStorage.getItem(STORAGE_KEY);
-    if (saved === 'light' || saved === 'dark') return saved;
-  } catch {
-    // Private browsing or blocked storage: fall through to the default.
-  }
-  // Dark (navy) is the product default; visitors can switch to light.
-  return 'dark';
-}
-
-function useTheme() {
-  const [theme, setTheme] = useState(readInitialTheme);
-
+/* --------------------------- single fixed theme --------------------------- */
+// One fixed navy theme for the whole app — no light/dark toggle.
+function useFixedTheme() {
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', theme === 'dark');
-    try {
-      window.localStorage.setItem(STORAGE_KEY, theme);
-    } catch {
-      // Not fatal — the class above has already applied for this session.
-    }
-  }, [theme]);
-
-  const toggle = useCallback(
-    () => setTheme((t) => (t === 'dark' ? 'light' : 'dark')),
-    []
-  );
-  return { theme, toggle };
+    document.documentElement.classList.add('dark');
+  }, []);
 }
 
 /* ------------------------- backend status chip ------------------------ */
@@ -94,7 +68,7 @@ const NAV = [
 ];
 
 export default function Layout({ children }) {
-  const { theme, toggle } = useTheme();
+  useFixedTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
 
@@ -144,18 +118,6 @@ export default function Layout({ children }) {
 
           <div className="flex items-center gap-2">
             <BackendStatus />
-            <button
-              type="button"
-              onClick={toggle}
-              className="grid h-11 w-11 cursor-pointer place-items-center rounded-xl text-muted-foreground transition-colors duration-200 hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-            >
-              {theme === 'dark' ? (
-                <Sun className="h-5 w-5" aria-hidden="true" />
-              ) : (
-                <Moon className="h-5 w-5" aria-hidden="true" />
-              )}
-            </button>
             <button
               type="button"
               onClick={() => setMenuOpen((o) => !o)}
