@@ -15,9 +15,8 @@ function readInitialTheme() {
   } catch {
     // Private browsing or blocked storage: fall through to the default.
   }
-  // Light is the product default; the OS preference only decides for dark.
-  if (window.matchMedia?.('(prefers-color-scheme: dark)').matches) return 'dark';
-  return 'light';
+  // Dark (navy) is the product default; visitors can switch to light.
+  return 'dark';
 }
 
 function useTheme() {
